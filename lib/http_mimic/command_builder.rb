@@ -1,0 +1,281 @@
+# frozen_string_literal: true
+
+require 'uri'
+require 'json'
+
+module HttpMimic
+  class CommandBuilder
+    COMMON_SEARCH_PATHS = [
+      '/opt/homebrew/bin',
+      '/usr/local/bin',
+      '/usr/bin',
+      '/bin',
+      File.expand_path('~/.local/bin')
+    ].freeze
+
+    TARGET_BINARY_MAP = {
+      'chrome'     => %w[curl_chrome116 curl_chrome120 curl_chrome110 curl-impersonate-chrome curl_chrome curl-impersonate],
+      'chrome116'  => %w[curl_chrome116 curl-impersonate-chrome curl_chrome curl-impersonate],
+      'chrome120'  => %w[curl_chrome120 curl-impersonate-chrome curl_chrome curl-impersonate],
+      'chrome110'  => %w[curl_chrome110 curl-impersonate-chrome curl_chrome curl-impersonate],
+      'chrome104'  => %w[curl_chrome104 curl-impersonate-chrome curl_chrome curl-impersonate],
+      'chrome101'  => %w[curl_chrome101 curl-impersonate-chrome curl_chrome curl-impersonate],
+      'chrome100'  => %w[curl_chrome100 curl-impersonate-chrome curl_chrome curl-impersonate],
+      'chrome99'   => %w[curl_chrome99 curl-impersonate-chrome curl_chrome curl-impersonate],
+      'firefox'    => %w[curl_ff117 curl_firefox117 curl_ff109 curl-impersonate-ff curl_firefox curl-impersonate],
+      'firefox117' => %w[curl_ff117 curl_firefox117 curl-impersonate-ff curl_firefox curl-impersonate],
+      'firefox109' => %w[curl_ff109 curl_firefox109 curl-impersonate-ff curl_firefox curl-impersonate],
+      'firefox102' => %w[curl_ff102 curl_firefox102 curl-impersonate-ff curl_firefox curl-impersonate],
+      'firefox98'  => %w[curl_ff98 curl_firefox98 curl-impersonate-ff curl_firefox curl-impersonate],
+      'safari'     => %w[curl_safari15_5 curl_safari15_3 curl-impersonate-safari curl_safari curl-impersonate],
+      'safari15_5' => %w[curl_safari15_5 curl-impersonate-safari curl_safari curl-impersonate],
+      'safari15_3' => %w[curl_safari15_3 curl-impersonate-safari curl_safari curl-impersonate],
+      'edge'       => %w[curl_edge101 curl_edge99 curl-impersonate-edge curl_edge curl-impersonate],
+      'edge101'    => %w[curl_edge101 curl-impersonate-edge curl_edge curl-impersonate],
+      'edge99'     => %w[curl_edge99 curl-impersonate-edge curl_edge curl-impersonate]
+    }.freeze
+
+    attr_reader :method, :url, :options, :config
+
+    def initialize(method, url, options = {}, config = nil)
+      @method  = method.to_s.upcase
+      @url     = url.to_s
+      @options = options.dup
+      @config  = config || HttpMimic.configuration
+    end
+
+    def build
+      binary = resolve_binary
+      args = []
+      stdin_data = nil
+
+      # 基礎 flags: 靜音模式但保留錯誤，輸出包含 HTTP Headers
+      args << '-s'
+      args << '-i'
+
+      # HTTP Method
+      if @method == 'HEAD'
+        args << '-I'
+      else
+        args << '-X' << @method
+      end
+
+      # 處理 URL 與 Query 參數
+      final_url = build_url
+
+      # Redirects
+      follow = options.fetch(:follow_redirects, config.follow_redirects)
+      if follow
+        args << '-L'
+        max_redirs = options[:max_redirects] || config.max_redirects
+        args << '--max-redirs' << max_redirs.to_s if max_redirs
+      end
+
+      # Timeouts
+      timeout = options[:timeout] || options[:read_timeout] || config.default_timeout
+      args << '--max-time' << timeout.to_s if timeout
+
+      connect_timeout = options[:connect_timeout] || config.default_connect_timeout
+      args << '--connect-timeout' << connect_timeout.to_s if connect_timeout
+
+      # SSL / Insecure
+      insecure = options[:insecure] || (options.key?(:verify_ssl) && !options[:verify_ssl])
+      args << '-k' if insecure
+      args << '--cacert' << options[:ssl_ca_file] if options[:ssl_ca_file]
+      args << '--cert' << options[:ssl_cert] if options[:ssl_cert]
+      args << '--key' << options[:ssl_key] if options[:ssl_key]
+
+      # Proxy
+      if options[:proxy]
+        args << '-x' << options[:proxy].to_s
+        if options[:proxy_auth]
+          u = options[:proxy_auth][:username]
+          p = options[:proxy_auth][:password]
+          args << '--proxy-user' << "#{u}:#{p}"
+        end
+      end
+
+      # Basic / Digest Auth
+      if options[:basic_auth]
+        u = options[:basic_auth][:username]
+        p = options[:basic_auth][:password]
+        args << '-u' << "#{u}:#{p}"
+      elsif options[:digest_auth]
+        u = options[:digest_auth][:username]
+        p = options[:digest_auth][:password]
+        args << '--digest' << '-u' << "#{u}:#{p}"
+      end
+
+      # Headers
+      headers_to_send = Headers.new(options[:headers] || {})
+      
+      # Bearer Token
+      if options[:bearer_token]
+        headers_to_send['Authorization'] = "Bearer #{options[:bearer_token]}"
+      end
+
+      # Body / JSON / Form
+      if options.key?(:json)
+        headers_to_send['Content-Type'] ||= 'application/json'
+        headers_to_send['Accept'] ||= 'application/json'
+        
+        json_data = options[:json]
+        stdin_data = json_data.is_a?(String) ? json_data : JSON.dump(json_data)
+        args << '-d' << '@-'
+      elsif options.key?(:body)
+        body_data = options[:body]
+        if body_data.is_a?(Hash)
+          headers_to_send['Content-Type'] ||= 'application/x-www-form-urlencoded'
+          stdin_data = encode_params(body_data)
+        else
+          stdin_data = body_data.to_s
+        end
+        args << '-d' << '@-'
+      elsif options[:form_data] || options[:form] || options[:multipart]
+        form_hash = options[:form_data] || options[:form] || options[:multipart]
+        if form_hash.is_a?(Hash)
+          form_hash.each do |k, v|
+            args << '-F' << "#{k}=#{v}"
+          end
+        end
+      end
+
+      # Cookies
+      if options[:cookies]
+        args << '-b' << Cookies.format(options[:cookies])
+      elsif options[:cookie_file]
+        args << '-b' << options[:cookie_file].to_s
+      end
+
+      if options[:cookie_jar]
+        args << '-c' << options[:cookie_jar].to_s
+      end
+
+      # User-Agent
+      if options[:user_agent]
+        args << '-A' << options[:user_agent].to_s
+      end
+
+      # 輸出 Headers
+      headers_to_send.each do |k, v|
+        if v.is_a?(Array)
+          v.each { |item| args << '-H' << "#{k}: #{item}" }
+        else
+          args << '-H' << "#{k}: #{v}"
+        end
+      end
+
+      # 自訂額外 curl options
+      if options[:curl_options]
+        extra_opts = options[:curl_options]
+        extra_opts = extra_opts.split if extra_opts.is_a?(String)
+        args.concat(Array(extra_opts))
+      end
+
+      # 最後放 URL
+      args << final_url
+
+      [binary, args, stdin_data, final_url]
+    end
+
+    def resolve_binary
+      # 1. 優先使用 options 或 config 的明確 binary_path
+      explicit = options[:binary] || config.binary_path
+      if explicit
+        path = find_executable(explicit) || explicit
+        return path if executable?(path)
+        raise BinaryNotFoundError, "指定的執行檔不存在或不可執行: #{explicit}"
+      end
+
+      # 2. 根據 impersonate 目標尋找對應的 binary
+      target = (options[:impersonate] || config.default_impersonate).to_s.downcase
+      candidate_names = TARGET_BINARY_MAP[target] || ["curl_#{target}", target]
+
+      candidate_names.each do |name|
+        path = find_executable(name)
+        return path if path
+      end
+
+      # 3. 若找不到特定版本，檢查是否有統一的 curl-impersonate 執行檔
+      %w[curl-impersonate-chrome curl-impersonate-ff curl-impersonate].each do |name|
+        path = find_executable(name)
+        return path if path
+      end
+
+      # 4. Fallback 檢查
+      if config.fallback_to_curl
+        curl_path = find_executable('curl') || 'curl'
+        return curl_path if executable?(curl_path)
+      end
+
+      raise BinaryNotFoundError, "找不到符合 '#{target}' 的 curl-impersonate 執行檔，且未找到可用的 curl。"
+    end
+
+    private
+
+    def build_url
+      base = options[:base_uri] || ''
+      full = if @url.start_with?('http://', 'https://')
+               @url
+             elsif base.empty?
+               @url
+             else
+               URI.join(base.end_with?('/') ? base : "#{base}/", @url.sub(%r{^/}, '')).to_s
+             end
+
+      query_params = options[:query] || options[:params]
+      if query_params && !query_params.empty?
+        uri = URI.parse(full)
+        existing_query = uri.query
+        new_query = encode_params(query_params)
+        uri.query = existing_query && !existing_query.empty? ? "#{existing_query}&#{new_query}" : new_query
+        uri.to_s
+      else
+        full
+      end
+    rescue URI::InvalidURIError
+      full
+    end
+
+    def encode_params(params)
+      if defined?(Rack::Utils) && Rack::Utils.respond_to?(:build_nested_query)
+        Rack::Utils.build_nested_query(params)
+      else
+        URI.encode_www_form(flatten_params(params))
+      end
+    end
+
+    def flatten_params(params, parent_key = nil)
+      params.flat_map do |k, v|
+        full_key = parent_key ? "#{parent_key}[#{k}]" : k.to_s
+        if v.is_a?(Hash)
+          flatten_params(v, full_key)
+        elsif v.is_a?(Array)
+          v.map { |item| ["#{full_key}[]", item] }
+        else
+          [[full_key, v]]
+        end
+      end
+    end
+
+    def find_executable(name)
+      return name if name.include?(File::SEPARATOR) && executable?(name)
+
+      # 搜尋系統 PATH
+      paths = ENV['PATH'].to_s.split(File::PATH_SEPARATOR) + COMMON_SEARCH_PATHS
+      paths.uniq.each do |dir|
+        next unless dir && Dir.exist?(dir)
+        full_path = File.join(dir, name)
+        return full_path if executable?(full_path)
+      end
+
+      nil
+    end
+
+    def executable?(path)
+      File.file?(path) && File.executable?(path)
+    rescue StandardError
+      false
+    end
+  end
+end
