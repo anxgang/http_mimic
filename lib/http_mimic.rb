@@ -33,12 +33,12 @@ module HttpMimic
       @configuration = Configuration.new
     end
 
-    # 手動下載 / 安裝 curl-impersonate 二進制執行檔
+    # Manually download and install curl-impersonate binary driver
     def download_driver!(version: nil, force: false)
       Downloader.download!(version: version, force: force)
     end
 
-    # 檢查本地是否已安裝 curl-impersonate
+    # Check if curl-impersonate driver is installed locally
     def driver_installed?(version: nil)
       Downloader.installed?(version: version)
     end

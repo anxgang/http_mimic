@@ -64,7 +64,7 @@ module HttpMimic
       to_cookie_string
     end
 
-    # 從 Set-Cookie headers 解析出 Cookies 物件
+    # Parse a Cookies object from Set-Cookie headers
     def self.parse_set_cookie(header_value_or_array)
       cookies = new
       headers = Array(header_value_or_array).flatten.compact
@@ -94,7 +94,7 @@ module HttpMimic
       cookies
     end
 
-    # 將 Hash 或 String 轉換為 curl -b 格式字串
+    # Format Hash, Cookies, or String into a curl -b cookie string
     def self.format(cookie_input)
       case cookie_input
       when Hash

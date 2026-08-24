@@ -63,7 +63,7 @@ class HttpMimicTest < Minitest::Test
 
     binary, args, stdin_data, final_url = builder.build
 
-    assert_includes ['curl', 'curl_chrome116', 'curl-impersonate-chrome'], File.basename(binary)
+    assert_includes ['curl', 'curl_chrome131', 'curl_chrome116', 'curl-impersonate-chrome'], File.basename(binary)
     assert_includes args, '-s'
     assert_includes args, '-i'
     assert_includes args, '-X'

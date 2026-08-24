@@ -17,16 +17,16 @@ module HttpMimic
     end
 
     def parse
-      # 拆分 Header 區塊與 Body
+      # Split header blocks and body
       header_blocks, body = split_headers_and_body(@raw_output)
 
       final_header_block = header_blocks.last || ''
       history_header_blocks = header_blocks.size > 1 ? header_blocks[0...-1] : []
 
-      # 解析最終 Status Line 與 Headers
+      # Parse final status line and headers
       code, http_version, status_message, headers, cookies = parse_header_block(final_header_block)
 
-      # 解析 Redirect 歷史記錄
+      # Parse redirect history
       history = history_header_blocks.map do |block|
         h_code, h_version, h_msg, h_headers, h_cookies = parse_header_block(block)
         {
@@ -39,7 +39,7 @@ module HttpMimic
         }
       end
 
-      # 解析 Body (自動偵測 JSON)
+      # Parse body (auto-detect JSON)
       parsed_body = parse_body(body, headers)
 
       Response.new(
@@ -61,11 +61,11 @@ module HttpMimic
 
     private
 
-    # 將 raw_output 依照 \r?\n\r?\n 區分 header 區塊與 body
+    # Split raw_output into header blocks and body by \r?\n\r?\n
     def split_headers_and_body(text)
       return [[], ''] if text.nil? || text.empty?
 
-      # 正規化換行
+      # Normalize line endings
       normalized = text.gsub(/\r\n/, "\n")
       parts = normalized.split("\n\n")
 
@@ -78,12 +78,12 @@ module HttpMimic
           header_blocks << part
           body_index = idx + 1
         else
-          # 一旦遇到非 HTTP Status 開頭的區塊，後面全部為 body
+          # Once a non-HTTP status block is encountered, the rest is body
           break
         end
       end
 
-      # 組合剩下的部分作為 body
+      # Combine remaining parts as body
       body = parts[body_index..-1] ? parts[body_index..-1].join("\n\n") : ''
 
       [header_blocks, body]

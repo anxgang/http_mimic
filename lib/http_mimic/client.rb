@@ -47,21 +47,21 @@ module HttpMimic
     def merge_options(base, override)
       result = base.merge(override)
 
-      # 深度合併 headers
+      # Deep merge headers
       if base[:headers] || override[:headers]
         base_headers = base[:headers] || {}
         over_headers = override[:headers] || {}
         result[:headers] = base_headers.merge(over_headers)
       end
 
-      # 深度合併 query / params
+      # Deep merge query / params
       base_query = base[:query] || base[:params] || {}
       over_query = override[:query] || override[:params] || {}
       if !base_query.empty? || !over_query.empty?
         result[:query] = base_query.merge(over_query)
       end
 
-      # 深度合併 cookies
+      # Deep merge cookies
       if base[:cookies].is_a?(Hash) && override[:cookies].is_a?(Hash)
         result[:cookies] = base[:cookies].merge(override[:cookies])
       end

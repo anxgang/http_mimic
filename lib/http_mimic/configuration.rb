@@ -13,14 +13,14 @@ module HttpMimic
     attr_accessor :logger
     attr_accessor :debug
 
-    # Webdrivers-like 自動下載與管理設定
+    # Webdrivers-like auto download and driver management settings
     attr_accessor :auto_download
     attr_accessor :driver_version
     attr_accessor :install_dir
     attr_accessor :github_repo
 
     def initialize
-      @default_impersonate      = 'chrome116'
+      @default_impersonate      = 'chrome131'
       @binary_path              = nil
       @fallback_to_curl         = true
       @default_timeout          = 30
@@ -31,7 +31,7 @@ module HttpMimic
       @logger                   = nil
       @debug                    = false
 
-      # 預設開啟自動下載 curl-impersonate driver (lexiforest)
+      # Enable automatic downloading of curl-impersonate driver (lexiforest) by default
       @auto_download            = true
       @driver_version           = 'v2.1.1'
       @install_dir              = File.expand_path('~/.http_mimic/bin')

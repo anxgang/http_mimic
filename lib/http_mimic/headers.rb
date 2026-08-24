@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module HttpMimic
-  # 不區分大小寫且保留原始大小寫命名的 HTTP Header 封裝
+  # Case-insensitive HTTP Headers wrapper that preserves original casing
   class Headers
     include Enumerable
 
@@ -22,7 +22,7 @@ module HttpMimic
 
       norm_key = normalize_key(key)
       if norm_key == 'set-cookie' && @multi_values.key?(norm_key)
-        # 對於 set-cookie，如果有多個則回傳陣列
+        # For Set-Cookie, return an Array if multiple values exist
         @multi_values[norm_key].size > 1 ? @multi_values[norm_key] : @multi_values[norm_key].first
       else
         @headers[canonical]
@@ -42,7 +42,7 @@ module HttpMimic
       @multi_values[norm] = value.is_a?(Array) ? value.dup : [value]
     end
 
-    # 新增 header（支援同名重複 header，例如多個 Set-Cookie）
+    # Add header (supports duplicate headers with the same name, e.g., multiple Set-Cookie entries)
     def add(key, value)
       return if key.nil?
       norm = normalize_key(key)

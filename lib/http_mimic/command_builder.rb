@@ -14,7 +14,7 @@ module HttpMimic
     ].freeze
 
     TARGET_BINARY_MAP = {
-      'chrome'       => %w[curl_chrome116 curl_chrome120 curl_chrome131 curl_chrome124 curl_chrome110 curl-impersonate-chrome curl_chrome curl-impersonate],
+      'chrome'       => %w[curl_chrome131 curl_chrome124 curl_chrome120 curl_chrome116 curl_chrome110 curl-impersonate-chrome curl_chrome curl-impersonate],
       'chrome116'    => %w[curl_chrome116 curl-impersonate-chrome curl_chrome curl-impersonate],
       'chrome120'    => %w[curl_chrome120 curl-impersonate-chrome curl_chrome curl-impersonate],
       'chrome123'    => %w[curl_chrome123 curl-impersonate-chrome curl_chrome curl-impersonate],
@@ -64,7 +64,7 @@ module HttpMimic
       args = []
       stdin_data = nil
 
-      # 基礎 flags: 靜音模式但保留錯誤，輸出包含 HTTP Headers
+      # Base flags: silent mode, include HTTP headers
       args << '-s'
       args << '-i'
 
@@ -75,7 +75,7 @@ module HttpMimic
         args << '-X' << @method
       end
 
-      # 處理 URL 與 Query 參數
+      # Process URL and query parameters
       final_url = build_url
 
       # Redirects
@@ -171,7 +171,7 @@ module HttpMimic
         args << '-A' << options[:user_agent].to_s
       end
 
-      # 輸出 Headers
+      # Append headers
       headers_to_send.each do |k, v|
         if v.is_a?(Array)
           v.each { |item| args << '-H' << "#{k}: #{item}" }
@@ -180,37 +180,37 @@ module HttpMimic
         end
       end
 
-      # 自訂額外 curl options
+      # Custom extra curl options
       if options[:curl_options]
         extra_opts = options[:curl_options]
         extra_opts = extra_opts.split if extra_opts.is_a?(String)
         args.concat(Array(extra_opts))
       end
 
-      # 最後放 URL
+      # Append final URL
       args << final_url
 
       [binary, args, stdin_data, final_url]
     end
 
     def resolve_binary
-      # 1. 優先使用 options 或 config 的明確 binary_path
+      # 1. Use explicit binary_path from options or config if provided
       explicit = options[:binary] || config.binary_path
       if explicit
         path = find_executable(explicit) || explicit
         return path if executable?(path)
-        raise BinaryNotFoundError, "指定的執行檔不存在或不可執行: #{explicit}"
+        raise BinaryNotFoundError, "Specified executable does not exist or is not executable: #{explicit}"
       end
 
       target = (options[:impersonate] || config.default_impersonate).to_s.downcase
       candidate_names = TARGET_BINARY_MAP[target] || ["curl_#{target}", target]
 
-      # 2. 檢查本地安裝目錄 (~/.http_mimic/bin)
+      # 2. Check local installation directory (~/.http_mimic/bin)
       if binary = find_in_download_dir(candidate_names)
         return binary
       end
 
-      # 3. 若本地未安裝，且開啟了 auto_download，進行自動下載
+      # 3. Auto-download driver if not installed locally and auto_download is enabled
       if config.auto_download
         begin
           Downloader.download!(version: config.driver_version, install_dir: config.install_dir)
@@ -219,32 +219,32 @@ module HttpMimic
           end
         rescue StandardError => e
           if config.logger
-            config.logger.warn("[HttpMimic] 自動下載 curl-impersonate 失敗: #{e.message}")
+            config.logger.warn("[HttpMimic] Failed to auto-download curl-impersonate: #{e.message}")
           elsif config.debug
-            puts "[HttpMimic WARN] 自動下載 curl-impersonate 失敗: #{e.message}"
+            puts "[HttpMimic WARN] Failed to auto-download curl-impersonate: #{e.message}"
           end
         end
       end
 
-      # 4. 根據 impersonate 目標搜尋系統 PATH
+      # 4. Search system PATH for target impersonate binary
       candidate_names.each do |name|
         path = find_executable(name)
         return path if path
       end
 
-      # 5. 若找不到特定版本，檢查是否有統一的 curl-impersonate 執行檔
+      # 5. Fall back to general curl-impersonate binary if specific version is not found
       %w[curl-impersonate-chrome curl-impersonate-ff curl-impersonate].each do |name|
         path = find_executable(name)
         return path if path
       end
 
-      # 6. Fallback 檢查
+      # 6. Fallback to system curl if enabled
       if config.fallback_to_curl
         curl_path = find_executable('curl') || 'curl'
         return curl_path if executable?(curl_path)
       end
 
-      raise BinaryNotFoundError, "找不到符合 '#{target}' 的 curl-impersonate 執行檔，且未找到可用的 curl。"
+      raise BinaryNotFoundError, "Could not find a curl-impersonate binary for '#{target}', and no fallback curl executable was found."
     end
 
     private
@@ -258,7 +258,7 @@ module HttpMimic
         return path if executable?(path)
       end
 
-      # 嘗試通用 curl-impersonate
+      # Try generic curl-impersonate binary
       gen_path = File.join(target_dir, 'curl-impersonate')
       return gen_path if executable?(gen_path)
 
@@ -313,7 +313,7 @@ module HttpMimic
     def find_executable(name)
       return name if name.include?(File::SEPARATOR) && executable?(name)
 
-      # 搜尋系統 PATH
+      # Search in system PATH
       paths = ENV['PATH'].to_s.split(File::PATH_SEPARATOR) + COMMON_SEARCH_PATHS
       paths.uniq.each do |dir|
         next unless dir && Dir.exist?(dir)

@@ -76,21 +76,21 @@ module HttpMimic
     def request(method, url, options = {})
       merged = default_options.merge(options)
 
-      # 深度合併 headers
+      # Deep merge headers
       if default_options[:headers] || options[:headers]
         base_h = default_options[:headers] || {}
         opt_h = options[:headers] || {}
         merged[:headers] = base_h.merge(opt_h)
       end
 
-      # 深度合併 query
+      # Deep merge query
       base_q = default_options[:query] || {}
       opt_q = options[:query] || options[:params] || {}
       if !base_q.empty? || !opt_q.empty?
         merged[:query] = base_q.merge(opt_q)
       end
 
-      # 深度合併 cookies
+      # Deep merge cookies
       if default_options[:cookies].is_a?(Hash) && options[:cookies].is_a?(Hash)
         merged[:cookies] = default_options[:cookies].merge(options[:cookies])
       end

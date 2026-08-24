@@ -1,13 +1,13 @@
 # frozen_string_literal: true
 
 module HttpMimic
-  # 基礎例外類別
+  # Base exception class
   class Error < StandardError; end
 
-  # 當找不到 curl-impersonate 執行檔時拋出
+  # Raised when the curl-impersonate binary cannot be found
   class BinaryNotFoundError < Error; end
 
-  # 當 curl 執行失敗或非 0 exit status 時拋出
+  # Raised when the curl command fails or returns a non-zero exit status
   class CommandError < Error
     attr_reader :exit_code, :stderr, :command, :response
 
@@ -20,15 +20,15 @@ module HttpMimic
     end
   end
 
-  # 連線超時 (Curl exit code 28)
+  # Connection timeout (Curl exit code 28)
   class TimeoutError < CommandError; end
 
-  # 連線失敗或 DNS 無法解析 (Curl exit code 6, 7, 52 等)
+  # Connection failure or DNS resolution error (Curl exit code 6, 7, 52, etc.)
   class ConnectionError < CommandError; end
 
-  # SSL/TLS 握手或憑證錯誤 (Curl exit code 35, 51, 60 等)
+  # SSL/TLS handshake or certificate error (Curl exit code 35, 51, 60, etc.)
   class SSLError < CommandError; end
 
-  # 回應解析失敗
+  # Raised when response parsing fails
   class ResponseParseError < Error; end
 end

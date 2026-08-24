@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-08-24
+
+### Added
+- **Live Fingerprint Test Suite**: Added integration tests (`rake test:live`) verifying real-world JA3, JA4, and Akamai HTTP/2 fingerprints against live endpoints (`tls.browserleaks.com`, `tls.peet.ws`).
+- **Standard MIT License**: Included official `LICENSE.txt` and repository metadata.
+- **Rakefile Integration**: Added standard Rake test tasks for unit tests, live tests, and full test suites.
+
+### Changed
+- **Default Impersonation Target**: Upgraded default impersonation from `chrome116` to modern `chrome131` with Post-Quantum (ML-KEM) and modern Client Hints support.
+- **Internationalization**: Fully translated all code comments, error messages, and documentation into English.
+
 ## [0.2.0] - 2026-08-24
 
 ### Added

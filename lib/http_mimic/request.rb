@@ -49,7 +49,7 @@ module HttpMimic
         Open3.capture3(*command_array)
       end
     rescue Errno::ENOENT => e
-      raise BinaryNotFoundError, "找不到執行檔 #{command_array.first}: #{e.message}"
+      raise BinaryNotFoundError, "Executable not found #{command_array.first}: #{e.message}"
     end
 
     def handle_errors(status, stderr, command, response)
@@ -57,7 +57,7 @@ module HttpMimic
       exit_code = status.exitstatus
 
       if exit_code != 0
-        message = "curl 執行錯誤 (exit code #{exit_code}): #{stderr.strip}"
+        message = "curl execution error (exit code #{exit_code}): #{stderr.strip}"
         error_class = case exit_code
                       when 28
                         TimeoutError
@@ -73,7 +73,7 @@ module HttpMimic
           raise error_class.new(message, exit_code: exit_code, stderr: stderr, command: command, response: response)
         end
       elsif raise_error && response.error?
-        raise CommandError.new("HTTP 請求失敗 (status #{response.code})", exit_code: exit_code, stderr: stderr, command: command, response: response)
+        raise CommandError.new("HTTP request failed (status #{response.code})", exit_code: exit_code, stderr: stderr, command: command, response: response)
       end
     end
 

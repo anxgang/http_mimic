@@ -24,9 +24,9 @@ module HttpMimic
 
         FileUtils.mkdir_p(target_dir)
 
-        # 檢查是否已安裝過該版本且檔案完整
+        # Check if the target version is already installed and intact
         if !force && installed?(version: target_version, install_dir: target_dir)
-          log_info("curl-impersonate #{target_version} 已安裝於 #{target_dir}")
+          log_info("curl-impersonate #{target_version} is already installed in #{target_dir}")
           return target_dir
         end
 
@@ -34,17 +34,17 @@ module HttpMimic
         asset_name = "curl-impersonate-#{target_version}.#{slug}.tar.gz"
         download_url = "https://github.com/#{target_repo}/releases/download/#{target_version}/#{asset_name}"
 
-        log_info("正在下載 curl-impersonate (#{target_version}) [#{asset_name}]...")
+        log_info("Downloading curl-impersonate (#{target_version}) [#{asset_name}]...")
 
         archive_data = fetch_binary(download_url)
 
-        log_info("正在解壓縮到 #{target_dir}...")
+        log_info("Extracting archive to #{target_dir}...")
         extract_tar_gz(archive_data, target_dir)
 
-        # 寫入版本紀錄標記檔
+        # Write version marker file
         File.write(version_file_path(target_dir), target_version)
 
-        log_info("curl-impersonate #{target_version} 安裝完成！")
+        log_info("curl-impersonate #{target_version} installation complete!")
         target_dir
       end
 
@@ -90,7 +90,7 @@ module HttpMimic
           when :arm64 then 'arm64-macos'
           when :x86_64 then 'x86_64-macos'
           else
-            raise UnsupportedPlatformError, "不支援的 macOS CPU 架構: #{cpu}"
+            raise UnsupportedPlatformError, "Unsupported macOS CPU architecture: #{cpu}"
           end
         when :linux
           libc = linux_libc
@@ -108,7 +108,7 @@ module HttpMimic
           when :loongarch64
             'loongarch64-linux-gnu'
           else
-            raise UnsupportedPlatformError, "不支援的 Linux CPU 架構: #{cpu}"
+            raise UnsupportedPlatformError, "Unsupported Linux CPU architecture: #{cpu}"
           end
         when :windows
           case cpu
@@ -116,17 +116,17 @@ module HttpMimic
           when :arm64 then 'arm64-win32'
           when :i386, :i686 then 'i686-win32'
           else
-            raise UnsupportedPlatformError, "不支援的 Windows CPU 架構: #{cpu}"
+            raise UnsupportedPlatformError, "Unsupported Windows CPU architecture: #{cpu}"
           end
         when :freebsd
           case cpu
           when :x86_64 then 'x86_64-freebsd'
           when :arm64, :aarch64 then 'aarch64-freebsd'
           else
-            raise UnsupportedPlatformError, "不支援的 FreeBSD CPU 架構: #{cpu}"
+            raise UnsupportedPlatformError, "Unsupported FreeBSD CPU architecture: #{cpu}"
           end
         else
-          raise UnsupportedPlatformError, "不支援的作業系統: #{RbConfig::CONFIG['host_os']}"
+          raise UnsupportedPlatformError, "Unsupported operating system: #{RbConfig::CONFIG['host_os']}"
         end
       end
 
@@ -192,7 +192,7 @@ module HttpMimic
       end
 
       def fetch_binary(url, limit = 5)
-        raise DownloadError, "下載失敗：轉址次數過多 (#{url})" if limit <= 0
+        raise DownloadError, "Download failed: too many redirects (#{url})" if limit <= 0
 
         uri = URI.parse(url)
         http = Net::HTTP.new(uri.host, uri.port)
@@ -212,14 +212,14 @@ module HttpMimic
           location = res['location']
           fetch_binary(location, limit - 1)
         else
-          raise DownloadError, "下載失敗，HTTP 回應碼 #{res.code}: #{url}"
+          raise DownloadError, "Download failed with HTTP status #{res.code}: #{url}"
         end
       rescue StandardError => e
-        raise DownloadError, "無法下載 curl-impersonate release: #{e.message}"
+        raise DownloadError, "Failed to download curl-impersonate release: #{e.message}"
       end
 
       def extract_tar_gz(data, dest_dir)
-        # 1. 優先嘗試系統 tar 指令
+        # 1. Try system tar command first
         begin
           tmp_tar = File.join(dest_dir, ".temp_download_#{Process.pid}.tar.gz")
           File.binwrite(tmp_tar, data)
@@ -232,10 +232,10 @@ module HttpMimic
             return
           end
         rescue StandardError => e
-          log_info("系統 tar 指令執行失敗 (#{e.message})，改用 Ruby 純解壓縮...")
+          log_info("System tar command failed (#{e.message}), falling back to Ruby extraction...")
         end
 
-        # 2. Ruby 純程式碼解壓縮 Fallback
+        # 2. Pure Ruby tar.gz extraction fallback
         gz = Zlib::GzipReader.new(StringIO.new(data))
         tar = Gem::Package::TarReader.new(gz)
 
