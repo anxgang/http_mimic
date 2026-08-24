@@ -14,25 +14,40 @@ module HttpMimic
     ].freeze
 
     TARGET_BINARY_MAP = {
-      'chrome'     => %w[curl_chrome116 curl_chrome120 curl_chrome110 curl-impersonate-chrome curl_chrome curl-impersonate],
-      'chrome116'  => %w[curl_chrome116 curl-impersonate-chrome curl_chrome curl-impersonate],
-      'chrome120'  => %w[curl_chrome120 curl-impersonate-chrome curl_chrome curl-impersonate],
-      'chrome110'  => %w[curl_chrome110 curl-impersonate-chrome curl_chrome curl-impersonate],
-      'chrome104'  => %w[curl_chrome104 curl-impersonate-chrome curl_chrome curl-impersonate],
-      'chrome101'  => %w[curl_chrome101 curl-impersonate-chrome curl_chrome curl-impersonate],
-      'chrome100'  => %w[curl_chrome100 curl-impersonate-chrome curl_chrome curl-impersonate],
-      'chrome99'   => %w[curl_chrome99 curl-impersonate-chrome curl_chrome curl-impersonate],
-      'firefox'    => %w[curl_ff117 curl_firefox117 curl_ff109 curl-impersonate-ff curl_firefox curl-impersonate],
-      'firefox117' => %w[curl_ff117 curl_firefox117 curl-impersonate-ff curl_firefox curl-impersonate],
-      'firefox109' => %w[curl_ff109 curl_firefox109 curl-impersonate-ff curl_firefox curl-impersonate],
-      'firefox102' => %w[curl_ff102 curl_firefox102 curl-impersonate-ff curl_firefox curl-impersonate],
-      'firefox98'  => %w[curl_ff98 curl_firefox98 curl-impersonate-ff curl_firefox curl-impersonate],
-      'safari'     => %w[curl_safari15_5 curl_safari15_3 curl-impersonate-safari curl_safari curl-impersonate],
-      'safari15_5' => %w[curl_safari15_5 curl-impersonate-safari curl_safari curl-impersonate],
-      'safari15_3' => %w[curl_safari15_3 curl-impersonate-safari curl_safari curl-impersonate],
-      'edge'       => %w[curl_edge101 curl_edge99 curl-impersonate-edge curl_edge curl-impersonate],
-      'edge101'    => %w[curl_edge101 curl-impersonate-edge curl_edge curl-impersonate],
-      'edge99'     => %w[curl_edge99 curl-impersonate-edge curl_edge curl-impersonate]
+      'chrome'       => %w[curl_chrome116 curl_chrome120 curl_chrome131 curl_chrome124 curl_chrome110 curl-impersonate-chrome curl_chrome curl-impersonate],
+      'chrome116'    => %w[curl_chrome116 curl-impersonate-chrome curl_chrome curl-impersonate],
+      'chrome120'    => %w[curl_chrome120 curl-impersonate-chrome curl_chrome curl-impersonate],
+      'chrome123'    => %w[curl_chrome123 curl-impersonate-chrome curl_chrome curl-impersonate],
+      'chrome124'    => %w[curl_chrome124 curl-impersonate-chrome curl_chrome curl-impersonate],
+      'chrome131'    => %w[curl_chrome131 curl-impersonate-chrome curl_chrome curl-impersonate],
+      'chrome133a'   => %w[curl_chrome133a curl-impersonate-chrome curl_chrome curl-impersonate],
+      'chrome136'    => %w[curl_chrome136 curl-impersonate-chrome curl_chrome curl-impersonate],
+      'chrome142'    => %w[curl_chrome142 curl-impersonate-chrome curl_chrome curl-impersonate],
+      'chrome110'    => %w[curl_chrome110 curl-impersonate-chrome curl_chrome curl-impersonate],
+      'chrome107'    => %w[curl_chrome107 curl-impersonate-chrome curl_chrome curl-impersonate],
+      'chrome104'    => %w[curl_chrome104 curl-impersonate-chrome curl_chrome curl-impersonate],
+      'chrome101'    => %w[curl_chrome101 curl-impersonate-chrome curl_chrome curl-impersonate],
+      'chrome100'    => %w[curl_chrome100 curl-impersonate-chrome curl_chrome curl-impersonate],
+      'chrome99'     => %w[curl_chrome99 curl-impersonate-chrome curl_chrome curl-impersonate],
+      'firefox'      => %w[curl_firefox135 curl_firefox133 curl_ff117 curl_firefox117 curl_ff109 curl-impersonate-ff curl_firefox curl-impersonate],
+      'firefox135'   => %w[curl_firefox135 curl-impersonate-ff curl_firefox curl-impersonate],
+      'firefox133'   => %w[curl_firefox133 curl-impersonate-ff curl_firefox curl-impersonate],
+      'firefox117'   => %w[curl_ff117 curl_firefox117 curl-impersonate-ff curl_firefox curl-impersonate],
+      'firefox109'   => %w[curl_ff109 curl_firefox109 curl-impersonate-ff curl_firefox curl-impersonate],
+      'firefox102'   => %w[curl_ff102 curl_firefox102 curl-impersonate-ff curl_firefox curl-impersonate],
+      'firefox98'    => %w[curl_ff98 curl_firefox98 curl-impersonate-ff curl_firefox curl-impersonate],
+      'safari'       => %w[curl_safari180 curl_safari170 curl_safari155 curl_safari153 curl-impersonate-safari curl_safari curl-impersonate],
+      'safari180'    => %w[curl_safari180 curl_safari18_0 curl-impersonate-safari curl_safari curl-impersonate],
+      'safari170'    => %w[curl_safari170 curl_safari17_0 curl-impersonate-safari curl_safari curl-impersonate],
+      'safari155'    => %w[curl_safari155 curl_safari15_5 curl-impersonate-safari curl_safari curl-impersonate],
+      'safari15_5'   => %w[curl_safari155 curl_safari15_5 curl-impersonate-safari curl_safari curl-impersonate],
+      'safari153'    => %w[curl_safari153 curl_safari15_3 curl-impersonate-safari curl_safari curl-impersonate],
+      'safari15_3'   => %w[curl_safari153 curl_safari15_3 curl-impersonate-safari curl_safari curl-impersonate],
+      'edge'         => %w[curl_edge101 curl_edge99 curl-impersonate-edge curl_edge curl-impersonate],
+      'edge101'      => %w[curl_edge101 curl-impersonate-edge curl_edge curl-impersonate],
+      'edge99'       => %w[curl_edge99 curl-impersonate-edge curl_edge curl-impersonate],
+      'tor'          => %w[curl_tor145 curl_tor curl-impersonate],
+      'tor145'       => %w[curl_tor145 curl_tor curl-impersonate]
     }.freeze
 
     attr_reader :method, :url, :options, :config
@@ -187,22 +202,43 @@ module HttpMimic
         raise BinaryNotFoundError, "指定的執行檔不存在或不可執行: #{explicit}"
       end
 
-      # 2. 根據 impersonate 目標尋找對應的 binary
       target = (options[:impersonate] || config.default_impersonate).to_s.downcase
       candidate_names = TARGET_BINARY_MAP[target] || ["curl_#{target}", target]
 
+      # 2. 檢查本地安裝目錄 (~/.http_mimic/bin)
+      if binary = find_in_download_dir(candidate_names)
+        return binary
+      end
+
+      # 3. 若本地未安裝，且開啟了 auto_download，進行自動下載
+      if config.auto_download
+        begin
+          Downloader.download!(version: config.driver_version, install_dir: config.install_dir)
+          if binary = find_in_download_dir(candidate_names)
+            return binary
+          end
+        rescue StandardError => e
+          if config.logger
+            config.logger.warn("[HttpMimic] 自動下載 curl-impersonate 失敗: #{e.message}")
+          elsif config.debug
+            puts "[HttpMimic WARN] 自動下載 curl-impersonate 失敗: #{e.message}"
+          end
+        end
+      end
+
+      # 4. 根據 impersonate 目標搜尋系統 PATH
       candidate_names.each do |name|
         path = find_executable(name)
         return path if path
       end
 
-      # 3. 若找不到特定版本，檢查是否有統一的 curl-impersonate 執行檔
+      # 5. 若找不到特定版本，檢查是否有統一的 curl-impersonate 執行檔
       %w[curl-impersonate-chrome curl-impersonate-ff curl-impersonate].each do |name|
         path = find_executable(name)
         return path if path
       end
 
-      # 4. Fallback 檢查
+      # 6. Fallback 檢查
       if config.fallback_to_curl
         curl_path = find_executable('curl') || 'curl'
         return curl_path if executable?(curl_path)
@@ -212,6 +248,22 @@ module HttpMimic
     end
 
     private
+
+    def find_in_download_dir(candidates)
+      target_dir = File.expand_path(config.install_dir)
+      return nil unless Dir.exist?(target_dir)
+
+      candidates.each do |name|
+        path = File.join(target_dir, name)
+        return path if executable?(path)
+      end
+
+      # 嘗試通用 curl-impersonate
+      gen_path = File.join(target_dir, 'curl-impersonate')
+      return gen_path if executable?(gen_path)
+
+      nil
+    end
 
     def build_url
       base = options[:base_uri] || ''

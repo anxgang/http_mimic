@@ -7,6 +7,7 @@ require 'json'
 require 'http_mimic/version'
 require 'http_mimic/exceptions'
 require 'http_mimic/configuration'
+require 'http_mimic/downloader'
 require 'http_mimic/headers'
 require 'http_mimic/cookies'
 require 'http_mimic/response'
@@ -30,6 +31,16 @@ module HttpMimic
 
     def reset_configuration!
       @configuration = Configuration.new
+    end
+
+    # 手動下載 / 安裝 curl-impersonate 二進制執行檔
+    def download_driver!(version: nil, force: false)
+      Downloader.download!(version: version, force: force)
+    end
+
+    # 檢查本地是否已安裝 curl-impersonate
+    def driver_installed?(version: nil)
+      Downloader.installed?(version: version)
     end
 
     def included(base)

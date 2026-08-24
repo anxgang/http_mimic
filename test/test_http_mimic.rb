@@ -161,4 +161,14 @@ class HttpMimicTest < Minitest::Test
     assert_equal 'https://example.com', client.default_options[:base_uri]
     assert_equal 10, client.default_options[:timeout]
   end
+
+  def test_downloader_platform_slug
+    slug = HttpMimic::Downloader.platform_slug
+    refute_nil slug
+    assert_match(/(macos|linux|win32|freebsd)/, slug)
+  end
+
+  def test_downloader_installed_check
+    assert [true, false].include?(HttpMimic::Downloader.installed?)
+  end
 end
