@@ -171,6 +171,15 @@ module HttpMimic
         args << '-A' << options[:user_agent].to_s
       end
 
+      # Profile-specific headers & HTTP version defaults (for server/curl mode)
+      if options[:profile] == :curl
+        args << '--http1.1' unless (options[:curl_options] || []).to_s.include?('--http')
+        headers_to_send['User-Agent'] ||= (options[:user_agent] || 'Ruby')
+        headers_to_send['Accept'] ||= '*/*'
+        headers_to_send['Accept-Encoding'] ||= 'gzip;q=1.0,deflate;q=0.6,identity;q=0.3'
+        headers_to_send['Connection'] ||= 'close'
+      end
+
       # Append headers
       headers_to_send.each do |k, v|
         if v.is_a?(Array)
@@ -194,6 +203,13 @@ module HttpMimic
     end
 
     def resolve_binary
+      # 0. If profile is explicitly set to :curl, use system curl
+      if options[:profile] == :curl
+        curl_path = find_executable('curl') || 'curl'
+        return curl_path if executable?(curl_path)
+        raise BinaryNotFoundError, "System curl executable was not found."
+      end
+
       # 1. Use explicit binary_path from options or config if provided
       explicit = options[:binary] || config.binary_path
       if explicit

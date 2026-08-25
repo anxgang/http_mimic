@@ -171,4 +171,34 @@ class HttpMimicTest < Minitest::Test
   def test_downloader_installed_check
     assert [true, false].include?(HttpMimic::Downloader.installed?)
   end
+
+  def test_mode_and_strategy_configuration
+    assert_equal :auto, HttpMimic.configuration.mode
+    assert_equal true, HttpMimic.configuration.auto_fallback
+    assert_equal [403, 429, 503], HttpMimic.configuration.retry_statuses
+
+    HttpMimic.configure do |config|
+      config.mode = :curl_first
+      config.auto_fallback = false
+      config.retry_statuses = [403, 500]
+    end
+
+    assert_equal :curl_first, HttpMimic.configuration.mode
+    assert_equal false, HttpMimic.configuration.auto_fallback
+    assert_equal [403, 500], HttpMimic.configuration.retry_statuses
+  end
+
+  def test_command_builder_curl_profile_defaults
+    builder = HttpMimic::CommandBuilder.new(
+      :get,
+      'https://api.example.com/items',
+      { profile: :curl }
+    )
+
+    binary, args, _stdin, _url = builder.build
+    assert_equal 'curl', File.basename(binary)
+    assert_includes args, '--http1.1'
+    assert_includes args, 'User-Agent: Ruby'
+    assert_includes args, 'Accept: */*'
+  end
 end

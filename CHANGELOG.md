@@ -5,10 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.3.0] - 2026-08-24
+## [0.3.0] - 2026-08-25
 
 ### Added
-- **Live Fingerprint Test Suite**: Added integration tests (`rake test:live`) verifying real-world JA3, JA4, and Akamai HTTP/2 fingerprints against live endpoints (`tls.browserleaks.com`, `tls.peet.ws`).
+- **Smart Adaptive Multi-Strategy Modes (`:auto`, `:impersonate_first`, `:curl_first`, `:impersonate_only`, `:curl_only`)**:
+  - **Zero-Configuration Protection Bypass (`:auto` mode, enabled by default)**: Seamlessly tries `curl-impersonate` first, and if blocked by WAFs with `403`/`429`/`503` (e.g. Akamai bot challenges requiring JS), automatically falls back to standard `curl` with server client headers to reliably retrieve 200 OK.
+  - Per-request and class-level configurable execution mode (`mode:`, `auto_fallback:`, `retry_statuses:`).
+  - Enhanced `Response` object with `response.mode_used`, `response.fallback_triggered?`, and `response.attempts` metadata.
+- **Live Fingerprint Test Suite**: Added integration tests (`rake test:live`) verifying real-world JA3, JA4, and Akamai HTTP/2 fingerprints against live endpoints (`tls.browserleaks.com`, `tls.peet.ws`, `asics.com`).
 - **Standard MIT License**: Included official `LICENSE.txt` and repository metadata.
 - **Rakefile Integration**: Added standard Rake test tasks for unit tests, live tests, and full test suites.
 

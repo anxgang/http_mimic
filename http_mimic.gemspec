@@ -14,7 +14,6 @@ Gem::Specification.new do |spec|
   spec.license       = "MIT"
 
   spec.metadata = {
-    "homepage_uri"    => "https://github.com/anxgang/http_mimic",
     "source_code_uri" => "https://github.com/anxgang/http_mimic",
     "bug_tracker_uri" => "https://github.com/anxgang/http_mimic/issues",
     "changelog_uri"   => "https://github.com/anxgang/http_mimic/blob/main/CHANGELOG.md"

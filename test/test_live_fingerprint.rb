@@ -62,6 +62,17 @@ class TestLiveFingerprint < Minitest::Test
     refute_equal chrome_ja3, firefox_ja3, 'Chrome and Firefox must have different JA3 hashes'
   end
 
+  def test_smart_auto_fallback_on_akamai_protected_site
+    url = 'https://www.asics.com/us/en-us/gt-2000-15/p/ANA_1011C235-750.html'
+    response = fetch_with_retry(url, timeout: 20)
+    skip 'ASICS endpoint is temporarily unreachable' if response.code.zero?
+
+    assert_equal 200, response.code
+    assert response.success?
+    assert_equal :curl, response.mode_used
+    assert response.fallback_triggered?
+  end
+
   private
 
   def fetch_with_retry(url, options = {}, max_retries = 2)

@@ -14,33 +14,88 @@ module HttpMimic
     end
 
     def perform
-      builder = CommandBuilder.new(method, url, options, config)
-      binary, args, stdin_data, final_url = builder.build
+      mode = (options[:mode] || config.mode || :auto).to_sym
+      auto_fallback = options.fetch(:auto_fallback, config.auto_fallback)
+      retry_statuses = options[:retry_statuses] || config.retry_statuses || [403, 429, 503]
 
-      full_command = [binary] + args
+      attempts = []
+      profiles_to_try = determine_profiles(mode, auto_fallback)
 
-      log_debug("Executing HttpMimic command: #{full_command.join(' ')}")
-      log_debug("Stdin data: #{stdin_data}") if stdin_data
+      response = nil
+      final_status = nil
+      final_stderr = nil
+      final_command = nil
 
-      stdout, stderr, status = execute_open3(full_command, stdin_data)
+      profiles_to_try.each_with_index do |profile, index|
+        current_opts = options.merge(profile: profile)
 
-      log_debug("Curl exit status: #{status.exitstatus}")
-      log_debug("Curl stderr: #{stderr}") unless stderr.empty?
+        builder = CommandBuilder.new(method, url, current_opts, config)
+        binary, args, stdin_data, final_url = builder.build
+        full_command = [binary] + args
 
-      response = ResponseParser.new(
-        stdout,
-        exit_status: status,
-        stderr: stderr,
-        command: full_command,
-        request_url: final_url
-      ).parse
+        log_debug("Executing HttpMimic command (attempt #{index + 1}, profile: #{profile}): #{full_command.join(' ')}")
+        log_debug("Stdin data: #{stdin_data}") if stdin_data
 
-      handle_errors(status, stderr, full_command, response)
+        stdout, stderr, status = execute_open3(full_command, stdin_data)
 
+        log_debug("Curl exit status: #{status.exitstatus}")
+        log_debug("Curl stderr: #{stderr}") unless stderr.empty?
+
+        response = ResponseParser.new(
+          stdout,
+          exit_status: status,
+          stderr: stderr,
+          command: full_command,
+          request_url: final_url
+        ).parse
+
+        response.mode_used = profile
+        response.fallback_triggered = (index > 0)
+
+        attempts << {
+          attempt: index + 1,
+          profile: profile,
+          command: full_command,
+          code: response.code,
+          exit_code: status.exitstatus,
+          success: response.success?
+        }
+        response.attempts = attempts
+
+        final_status = status
+        final_stderr = stderr
+        final_command = full_command
+
+        is_blocked = (status.exitstatus != 0) || retry_statuses.include?(response.code)
+        if !is_blocked || (index == profiles_to_try.size - 1)
+          break
+        end
+
+        log_debug("[HttpMimic] Attempt #{index + 1} with #{profile} resulted in status #{response.code}. Triggering smart fallback to next profile...")
+      end
+
+      handle_errors(final_status, final_stderr, final_command, response)
       response
     end
 
     private
+
+    def determine_profiles(mode, auto_fallback)
+      case mode
+      when :curl, :curl_first
+        auto_fallback ? [:curl, :impersonate] : [:curl]
+      when :curl_only
+        [:curl]
+      when :impersonate_only
+        [:impersonate]
+      when :impersonate_first
+        auto_fallback ? [:impersonate, :curl] : [:impersonate]
+      when :auto, :smart
+        auto_fallback ? [:impersonate, :curl] : [:impersonate]
+      else
+        auto_fallback ? [:impersonate, :curl] : [:impersonate]
+      end
+    end
 
     def execute_open3(command_array, stdin_data)
       if stdin_data
@@ -54,6 +109,7 @@ module HttpMimic
 
     def handle_errors(status, stderr, command, response)
       raise_error = options.fetch(:raise_on_error, config.raise_on_error)
+      return unless status
       exit_code = status.exitstatus
 
       if exit_code != 0
@@ -72,7 +128,7 @@ module HttpMimic
         if raise_error
           raise error_class.new(message, exit_code: exit_code, stderr: stderr, command: command, response: response)
         end
-      elsif raise_error && response.error?
+      elsif raise_error && response&.error?
         raise CommandError.new("HTTP request failed (status #{response.code})", exit_code: exit_code, stderr: stderr, command: command, response: response)
       end
     end

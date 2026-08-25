@@ -16,22 +16,34 @@ module HttpMimic
                 :exit_code,
                 :command
 
+    attr_accessor :mode_used,
+                  :fallback_triggered,
+                  :attempts
+
     alias status code
+    alias strategy_used mode_used
 
     def initialize(attributes = {})
-      @code            = attributes[:code] || 0
-      @http_version    = attributes[:http_version]
-      @status_message  = attributes[:status_message]
-      @headers         = attributes[:headers] || Headers.new
-      @cookies         = attributes[:cookies] || Cookies.new
-      @body            = attributes[:body] || ''
-      @parsed_response = attributes[:parsed_response]
-      @raw_headers     = attributes[:raw_headers] || ''
-      @history         = attributes[:history] || []
-      @request_url     = attributes[:request_url]
-      @stderr          = attributes[:stderr] || ''
-      @exit_code       = attributes[:exit_code] || 0
-      @command         = attributes[:command]
+      @code               = attributes[:code] || 0
+      @http_version       = attributes[:http_version]
+      @status_message     = attributes[:status_message]
+      @headers            = attributes[:headers] || Headers.new
+      @cookies            = attributes[:cookies] || Cookies.new
+      @body               = attributes[:body] || ''
+      @parsed_response    = attributes[:parsed_response]
+      @raw_headers        = attributes[:raw_headers] || ''
+      @history            = attributes[:history] || []
+      @request_url        = attributes[:request_url]
+      @stderr             = attributes[:stderr] || ''
+      @exit_code          = attributes[:exit_code] || 0
+      @command            = attributes[:command]
+      @mode_used          = attributes[:mode_used] || :impersonate
+      @fallback_triggered = attributes[:fallback_triggered] || false
+      @attempts           = attributes[:attempts] || []
+    end
+
+    def fallback_triggered?
+      !!@fallback_triggered
     end
 
     def success?

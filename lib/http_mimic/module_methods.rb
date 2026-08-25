@@ -41,6 +41,21 @@ module HttpMimic
       default_options[:cookies].merge!(c)
     end
 
+    def mode(m = nil)
+      return default_options[:mode] if m.nil?
+      default_options[:mode] = m
+    end
+
+    def auto_fallback(enabled = nil)
+      return default_options[:auto_fallback] if enabled.nil?
+      default_options[:auto_fallback] = enabled
+    end
+
+    def retry_statuses(statuses = nil)
+      return default_options[:retry_statuses] if statuses.nil?
+      default_options[:retry_statuses] = statuses
+    end
+
     def default_options
       @default_options ||= {}
     end

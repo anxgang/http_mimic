@@ -142,6 +142,7 @@ puts "User-Agent: #{res['user_agent']}"
 ```ruby
 client = HttpMimic::Client.new(
   base_uri: 'https://api.example.com',
+  mode: :auto,
   impersonate: 'firefox135',
   timeout: 15,
   headers: {
@@ -158,12 +159,41 @@ response = client.post('/v1/users', json: { username: 'bob' })
 
 ---
 
+## 🧠 Smart Adaptive Modes (Zero-Configuration Scraping)
+
+`HttpMimic` provides built-in multi-strategy orchestration so you can fetch protected websites without worrying about which specific WAF (Cloudflare, Akamai, DataDome) protects them:
+
+- **`:auto` (Default & Recommended)**: Tries `curl-impersonate` (Chrome 131) first. If blocked by WAFs like Akamai with `403`/`429`/`503` (which require JS telemetry for browsers but allow standard server clients), it **automatically and seamlessly retries with standard curl + server headers**, directly returning `200 OK`.
+- **`:impersonate_first`**: Prefers `curl-impersonate` and automatically falls back to standard `curl` if blocked.
+- **`:curl_first`**: Prefers standard `curl` and automatically upgrades to `curl-impersonate` if blocked.
+- **`:impersonate_only`**: Strictly uses `curl-impersonate` (no retry/fallback).
+- **`:curl_only`**: Strictly uses standard `curl` (no retry/fallback).
+
+```ruby
+# 1. No-Brain Auto Mode (Works automatically for both Cloudflare & Akamai):
+response = HttpMimic.get('https://www.asics.com/us/en-us/gt-2000-15/p/ANA_1011C235-750.html')
+puts response.code                 # => 200
+puts response.mode_used            # => :curl
+puts response.fallback_triggered?  # => true
+
+# 2. Per-request mode override:
+response = HttpMimic.get(url, mode: :curl_first)
+response = HttpMimic.get(url, mode: :impersonate_only)
+```
+
+---
+
 ## ⚙️ Global Configuration
 
 Configure global defaults in an initializer (e.g., `config/initializers/http_mimic.rb`):
 
 ```ruby
 HttpMimic.configure do |config|
+  # Multi-strategy & Smart Fallback
+  config.mode                    = :auto       # :auto (default), :impersonate_first, :curl_first, :impersonate_only, :curl_only
+  config.auto_fallback           = true        # Automatically retry with alternative profile if blocked
+  config.retry_statuses          = [403, 429, 503] # Status codes that trigger auto-fallback
+
   # Browser simulation & request defaults
   config.default_impersonate     = 'chrome131' # Default browser target
   config.default_timeout         = 30          # Request timeout (seconds)
@@ -188,6 +218,9 @@ end
 
 | Option | Type | Description |
 | :--- | :--- | :--- |
+| `:mode` | Symbol | Execution strategy: `:auto` (default), `:impersonate_first`, `:curl_first`, `:impersonate_only`, `:curl_only` |
+| `:auto_fallback` | Boolean | Whether to automatically retry with alternative profile on blocked status (default `true`) |
+| `:retry_statuses`| Array | Status codes that trigger auto-fallback (default `[403, 429, 503]`) |
 | `:impersonate` | String | Target browser to mimic (e.g., `'chrome131'`, `'chrome120'`, `'firefox135'`, `'safari180'`, `'tor145'`) |
 | `:binary` | String | Path to a custom `curl-impersonate` executable |
 | `:query` / `:params` | Hash | URL query parameters (supports nested parameters and encoding) |
@@ -234,10 +267,13 @@ response.headers['content-type'] # => Case-insensitive header access
 response.cookies['session_id']   # => Parsed Set-Cookie store
 response.history                 # => Array of redirect history metadata
 
-# Underlying execution details
-response.exit_code      # => Process exit status (0 for success)
-response.stderr         # => Stderr output from curl
-response.command        # => Array of the exact CLI arguments executed
+# Underlying execution & multi-strategy details
+response.mode_used            # => :impersonate or :curl
+response.fallback_triggered?  # => true if smart fallback was executed
+response.attempts             # => Array of execution metadata for each attempt
+response.exit_code            # => Process exit status (0 for success)
+response.stderr               # => Stderr output from curl
+response.command              # => Array of the exact CLI arguments executed
 ```
 
 ---

@@ -13,6 +13,11 @@ module HttpMimic
     attr_accessor :logger
     attr_accessor :debug
 
+    # Multi-strategy and smart auto-fallback settings
+    attr_accessor :mode
+    attr_accessor :auto_fallback
+    attr_accessor :retry_statuses
+
     # Webdrivers-like auto download and driver management settings
     attr_accessor :auto_download
     attr_accessor :driver_version
@@ -30,6 +35,11 @@ module HttpMimic
       @raise_on_error           = false
       @logger                   = nil
       @debug                    = false
+
+      # Multi-strategy defaults: :auto seamlessly falls back between impersonate and curl
+      @mode                     = :auto
+      @auto_fallback            = true
+      @retry_statuses           = [403, 429, 503]
 
       # Enable automatic downloading of curl-impersonate driver (lexiforest) by default
       @auto_download            = true
