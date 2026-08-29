@@ -5,6 +5,8 @@ require 'json'
 module HttpMimic
   class ResponseParser
     HTTP_STATUS_LINE_REGEX = /\AHTTP\/(?<version>[\d\.]+)\s+(?<code>\d{3})(?:\s+(?<message>.*))?/i
+    HTTP_STATUS_LINE_B     = /\AHTTP\/(?:[\d\.]+)\s+\d{3}/i
+    BINARY_MIME_KEYWORDS   = %w[image/ audio/ video/ pdf octet-stream zip gzip tar compressed stream font wasm].freeze
 
     attr_reader :raw_output, :exit_status, :stderr, :command, :request_url
 
@@ -17,8 +19,8 @@ module HttpMimic
     end
 
     def parse
-      # Split header blocks and body
-      header_blocks, body = split_headers_and_body(@raw_output)
+      # Split header blocks and body in binary-safe manner
+      header_blocks, raw_body = split_headers_and_body(@raw_output)
 
       final_header_block = header_blocks.last || ''
       history_header_blocks = header_blocks.size > 1 ? header_blocks[0...-1] : []
@@ -38,6 +40,14 @@ module HttpMimic
           raw_headers: block
         }
       end
+
+      # Process body: retain raw bytes for binary, or UTF-8 encode for text
+      content_type = headers['content-type'].to_s.downcase
+      body = if binary_content?(content_type, raw_body)
+               raw_body
+             else
+               raw_body.dup.force_encoding('UTF-8').scrub
+             end
 
       # Parse body (auto-detect JSON)
       parsed_body = parse_body(body, headers)
@@ -61,32 +71,36 @@ module HttpMimic
 
     private
 
-    # Split raw_output into header blocks and body by \r?\n\r?\n
+    # Split raw_output into header blocks and body in a binary-safe manner
     def split_headers_and_body(text)
-      return [[], ''] if text.nil? || text.empty?
+      return [[], ''.b] if text.nil? || text.empty?
 
-      # Normalize line endings
-      normalized = text.gsub(/\r\n/, "\n")
-      parts = normalized.split("\n\n")
-
+      remaining = text.to_s.b
       header_blocks = []
-      body_index = 0
 
-      parts.each_with_index do |part, idx|
-        trimmed = part.strip
-        if trimmed =~ HTTP_STATUS_LINE_REGEX
-          header_blocks << part
-          body_index = idx + 1
+      while remaining =~ HTTP_STATUS_LINE_B
+        crlf_idx = remaining.index("\r\n\r\n".b)
+        lf_idx   = remaining.index("\n\n".b)
+
+        break unless crlf_idx || lf_idx
+
+        if crlf_idx && lf_idx
+          delim_pos = [crlf_idx, lf_idx].min
+          delim_len = (delim_pos == crlf_idx) ? 4 : 2
+        elsif crlf_idx
+          delim_pos = crlf_idx
+          delim_len = 4
         else
-          # Once a non-HTTP status block is encountered, the rest is body
-          break
+          delim_pos = lf_idx
+          delim_len = 2
         end
+
+        header_block = remaining[0...delim_pos].force_encoding('UTF-8').scrub
+        header_blocks << header_block
+        remaining = remaining[(delim_pos + delim_len)..-1] || ''.b
       end
 
-      # Combine remaining parts as body
-      body = parts[body_index..-1] ? parts[body_index..-1].join("\n\n") : ''
-
-      [header_blocks, body]
+      [header_blocks, remaining]
     end
 
     def parse_header_block(block)
@@ -129,12 +143,22 @@ module HttpMimic
       [code, http_version, status_message, headers, cookies]
     end
 
+    def binary_content?(content_type, body)
+      return true if BINARY_MIME_KEYWORDS.any? { |kw| content_type.include?(kw) }
+
+      # Check for null bytes in the initial portion of body
+      sample = body[0, 1024]
+      sample&.include?("\x00".b)
+    end
+
     def parse_body(body, headers)
       return nil if body.nil? || body.empty?
 
       content_type = headers['content-type'].to_s.downcase
+      return body if binary_content?(content_type, body)
 
-      if content_type.include?('json') || body.strip.start_with?('{', '[')
+      trimmed = body.strip
+      if content_type.include?('json') || trimmed.start_with?('{', '[')
         begin
           JSON.parse(body)
         rescue JSON::ParserError

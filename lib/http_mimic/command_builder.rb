@@ -14,40 +14,70 @@ module HttpMimic
     ].freeze
 
     TARGET_BINARY_MAP = {
-      'chrome'       => %w[curl_chrome131 curl_chrome124 curl_chrome120 curl_chrome116 curl_chrome110 curl-impersonate-chrome curl_chrome curl-impersonate],
-      'chrome116'    => %w[curl_chrome116 curl-impersonate-chrome curl_chrome curl-impersonate],
-      'chrome120'    => %w[curl_chrome120 curl-impersonate-chrome curl_chrome curl-impersonate],
-      'chrome123'    => %w[curl_chrome123 curl-impersonate-chrome curl_chrome curl-impersonate],
-      'chrome124'    => %w[curl_chrome124 curl-impersonate-chrome curl_chrome curl-impersonate],
-      'chrome131'    => %w[curl_chrome131 curl-impersonate-chrome curl_chrome curl-impersonate],
-      'chrome133a'   => %w[curl_chrome133a curl-impersonate-chrome curl_chrome curl-impersonate],
-      'chrome136'    => %w[curl_chrome136 curl-impersonate-chrome curl_chrome curl-impersonate],
-      'chrome142'    => %w[curl_chrome142 curl-impersonate-chrome curl_chrome curl-impersonate],
-      'chrome110'    => %w[curl_chrome110 curl-impersonate-chrome curl_chrome curl-impersonate],
-      'chrome107'    => %w[curl_chrome107 curl-impersonate-chrome curl_chrome curl-impersonate],
-      'chrome104'    => %w[curl_chrome104 curl-impersonate-chrome curl_chrome curl-impersonate],
-      'chrome101'    => %w[curl_chrome101 curl-impersonate-chrome curl_chrome curl-impersonate],
-      'chrome100'    => %w[curl_chrome100 curl-impersonate-chrome curl_chrome curl-impersonate],
-      'chrome99'     => %w[curl_chrome99 curl-impersonate-chrome curl_chrome curl-impersonate],
-      'firefox'      => %w[curl_firefox135 curl_firefox133 curl_ff117 curl_firefox117 curl_ff109 curl-impersonate-ff curl_firefox curl-impersonate],
-      'firefox135'   => %w[curl_firefox135 curl-impersonate-ff curl_firefox curl-impersonate],
-      'firefox133'   => %w[curl_firefox133 curl-impersonate-ff curl_firefox curl-impersonate],
-      'firefox117'   => %w[curl_ff117 curl_firefox117 curl-impersonate-ff curl_firefox curl-impersonate],
-      'firefox109'   => %w[curl_ff109 curl_firefox109 curl-impersonate-ff curl_firefox curl-impersonate],
-      'firefox102'   => %w[curl_ff102 curl_firefox102 curl-impersonate-ff curl_firefox curl-impersonate],
-      'firefox98'    => %w[curl_ff98 curl_firefox98 curl-impersonate-ff curl_firefox curl-impersonate],
-      'safari'       => %w[curl_safari180 curl_safari170 curl_safari155 curl_safari153 curl-impersonate-safari curl_safari curl-impersonate],
-      'safari180'    => %w[curl_safari180 curl_safari18_0 curl-impersonate-safari curl_safari curl-impersonate],
-      'safari170'    => %w[curl_safari170 curl_safari17_0 curl-impersonate-safari curl_safari curl-impersonate],
-      'safari155'    => %w[curl_safari155 curl_safari15_5 curl-impersonate-safari curl_safari curl-impersonate],
-      'safari15_5'   => %w[curl_safari155 curl_safari15_5 curl-impersonate-safari curl_safari curl-impersonate],
-      'safari153'    => %w[curl_safari153 curl_safari15_3 curl-impersonate-safari curl_safari curl-impersonate],
-      'safari15_3'   => %w[curl_safari153 curl_safari15_3 curl-impersonate-safari curl_safari curl-impersonate],
-      'edge'         => %w[curl_edge101 curl_edge99 curl-impersonate-edge curl_edge curl-impersonate],
-      'edge101'      => %w[curl_edge101 curl-impersonate-edge curl_edge curl-impersonate],
-      'edge99'       => %w[curl_edge99 curl-impersonate-edge curl_edge curl-impersonate],
-      'tor'          => %w[curl_tor145 curl_tor curl-impersonate],
-      'tor145'       => %w[curl_tor145 curl_tor curl-impersonate]
+      # Chrome Desktop
+      'chrome'            => %w[curl_chrome131 curl_chrome124 curl_chrome120 curl_chrome116 curl_chrome110 curl-impersonate-chrome curl_chrome curl-impersonate],
+      'chrome116'         => %w[curl_chrome116 curl-impersonate-chrome curl_chrome curl-impersonate],
+      'chrome120'         => %w[curl_chrome120 curl-impersonate-chrome curl_chrome curl-impersonate],
+      'chrome123'         => %w[curl_chrome123 curl-impersonate-chrome curl_chrome curl-impersonate],
+      'chrome124'         => %w[curl_chrome124 curl-impersonate-chrome curl_chrome curl-impersonate],
+      'chrome131'         => %w[curl_chrome131 curl-impersonate-chrome curl_chrome curl-impersonate],
+      'chrome133a'        => %w[curl_chrome133a curl-impersonate-chrome curl_chrome curl-impersonate],
+      'chrome136'         => %w[curl_chrome136 curl-impersonate-chrome curl_chrome curl-impersonate],
+      'chrome142'         => %w[curl_chrome142 curl-impersonate-chrome curl_chrome curl-impersonate],
+      'chrome145'         => %w[curl_chrome145 curl_chrome146 curl_chrome150 curl_chrome131 curl-impersonate],
+      'chrome146'         => %w[curl_chrome146 curl_chrome150 curl_chrome145 curl_chrome131 curl-impersonate],
+      'chrome150'         => %w[curl_chrome150 curl_chrome146 curl_chrome145 curl_chrome131 curl-impersonate],
+      'chrome110'         => %w[curl_chrome110 curl-impersonate-chrome curl_chrome curl-impersonate],
+      'chrome107'         => %w[curl_chrome107 curl-impersonate-chrome curl_chrome curl-impersonate],
+      'chrome104'         => %w[curl_chrome104 curl-impersonate-chrome curl_chrome curl-impersonate],
+      'chrome101'         => %w[curl_chrome101 curl-impersonate-chrome curl_chrome curl-impersonate],
+      'chrome100'         => %w[curl_chrome100 curl-impersonate-chrome curl_chrome curl-impersonate],
+      'chrome99'          => %w[curl_chrome99 curl-impersonate-chrome curl_chrome curl-impersonate],
+
+      # Mobile / Android
+      'chrome131_android' => %w[curl_chrome131_android curl_chrome131 curl-impersonate-chrome curl-impersonate],
+      'chrome99_android'  => %w[curl_chrome99_android curl_chrome99 curl-impersonate-chrome curl-impersonate],
+      'android'           => %w[curl_chrome131_android curl_safari180_ios curl_chrome99_android curl_chrome131 curl-impersonate],
+      'chrome_android'    => %w[curl_chrome131_android curl_chrome99_android curl_chrome131 curl-impersonate],
+
+      # Firefox
+      'firefox'           => %w[curl_firefox135 curl_firefox133 curl_ff117 curl_firefox117 curl_ff109 curl-impersonate-ff curl_firefox curl-impersonate],
+      'firefox147'        => %w[curl_firefox147 curl_firefox144 curl_firefox135 curl-impersonate-ff curl-impersonate],
+      'firefox144'        => %w[curl_firefox144 curl_firefox147 curl_firefox135 curl-impersonate-ff curl-impersonate],
+      'firefox135'        => %w[curl_firefox135 curl-impersonate-ff curl_firefox curl-impersonate],
+      'firefox133'        => %w[curl_firefox133 curl-impersonate-ff curl_firefox curl-impersonate],
+      'firefox117'        => %w[curl_ff117 curl_firefox117 curl-impersonate-ff curl_firefox curl-impersonate],
+      'firefox109'        => %w[curl_ff109 curl_firefox109 curl-impersonate-ff curl_firefox curl-impersonate],
+      'firefox102'        => %w[curl_ff102 curl_firefox102 curl-impersonate-ff curl_firefox curl-impersonate],
+      'firefox98'         => %w[curl_ff98 curl_firefox98 curl-impersonate-ff curl_firefox curl-impersonate],
+
+      # Safari Desktop
+      'safari'            => %w[curl_safari180 curl_safari170 curl_safari184 curl_safari260 curl_safari155 curl_safari153 curl-impersonate-safari curl_safari curl-impersonate],
+      'safari2601'        => %w[curl_safari2601 curl_safari260 curl_safari180 curl-impersonate-safari curl-impersonate],
+      'safari260'         => %w[curl_safari260 curl_safari2601 curl_safari180 curl-impersonate-safari curl-impersonate],
+      'safari184'         => %w[curl_safari184 curl_safari180 curl-impersonate-safari curl-impersonate],
+      'safari180'         => %w[curl_safari180 curl_safari18_0 curl-impersonate-safari curl_safari curl-impersonate],
+      'safari170'         => %w[curl_safari170 curl_safari17_0 curl-impersonate-safari curl_safari curl-impersonate],
+      'safari155'         => %w[curl_safari155 curl_safari15_5 curl-impersonate-safari curl_safari curl-impersonate],
+      'safari15_5'        => %w[curl_safari155 curl_safari15_5 curl-impersonate-safari curl_safari curl-impersonate],
+      'safari153'         => %w[curl_safari153 curl_safari15_3 curl-impersonate-safari curl_safari curl-impersonate],
+      'safari15_3'        => %w[curl_safari153 curl_safari15_3 curl-impersonate-safari curl_safari curl-impersonate],
+
+      # Safari iOS / Mobile
+      'safari180_ios'     => %w[curl_safari180_ios curl_safari184_ios curl_safari260_ios curl_safari172_ios curl_safari180 curl-impersonate],
+      'safari184_ios'     => %w[curl_safari184_ios curl_safari180_ios curl_safari260_ios curl_safari172_ios curl_safari180 curl-impersonate],
+      'safari260_ios'     => %w[curl_safari260_ios curl_safari184_ios curl_safari180_ios curl_safari172_ios curl_safari180 curl-impersonate],
+      'safari172_ios'     => %w[curl_safari172_ios curl_safari180_ios curl_safari184_ios curl_safari180 curl-impersonate],
+      'ios'               => %w[curl_safari180_ios curl_safari184_ios curl_safari260_ios curl_safari172_ios curl_safari180 curl-impersonate],
+      'safari_ios'        => %w[curl_safari180_ios curl_safari184_ios curl_safari260_ios curl_safari172_ios curl_safari180 curl-impersonate],
+      'mobile'            => %w[curl_safari180_ios curl_chrome131_android curl_safari184_ios curl_safari260_ios curl-impersonate],
+
+      # Edge & Tor
+      'edge'              => %w[curl_edge101 curl_edge99 curl-impersonate-edge curl_edge curl-impersonate],
+      'edge101'           => %w[curl_edge101 curl-impersonate-edge curl_edge curl-impersonate],
+      'edge99'            => %w[curl_edge99 curl-impersonate-edge curl_edge curl-impersonate],
+      'tor'               => %w[curl_tor145 curl_tor curl-impersonate],
+      'tor145'            => %w[curl_tor145 curl_tor curl-impersonate]
     }.freeze
 
     attr_reader :method, :url, :options, :config
@@ -218,7 +248,16 @@ module HttpMimic
         raise BinaryNotFoundError, "Specified executable does not exist or is not executable: #{explicit}"
       end
 
-      target = (options[:impersonate] || config.default_impersonate).to_s.downcase
+      target = case options[:profile]
+               when :android
+                 (options[:android_impersonate] || 'chrome131_android').to_s.downcase
+               when :ios
+                 (options[:ios_impersonate] || 'safari260_ios').to_s.downcase
+               when :mobile
+                 (options[:mobile_impersonate] || 'chrome131_android').to_s.downcase
+               else
+                 (options[:impersonate] || config.default_impersonate).to_s.downcase
+               end
       candidate_names = TARGET_BINARY_MAP[target] || ["curl_#{target}", target]
 
       # 2. Check local installation directory (~/.http_mimic/bin)

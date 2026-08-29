@@ -201,4 +201,61 @@ class HttpMimicTest < Minitest::Test
     assert_includes args, 'User-Agent: Ruby'
     assert_includes args, 'Accept: */*'
   end
+
+  def test_response_parser_binary_data
+    # Simulated binary JPEG payload containing raw nulls and CRLFs
+    binary_payload = "\xFF\xD8\xFF\xE0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00\r\n\r\n\xFF\xDB".b
+    raw_response = "HTTP/2 200 \r\ncontent-type: image/jpeg\r\ncontent-length: #{binary_payload.bytesize}\r\n\r\n#{binary_payload}".b
+
+    parser = HttpMimic::ResponseParser.new(raw_response)
+    response = parser.parse
+
+    assert_equal 200, response.code
+    assert response.binary?
+    assert_equal 'image/jpeg', response.headers['content-type']
+    assert_equal binary_payload, response.body
+    assert_equal binary_payload.bytesize, response.body.bytesize
+  end
+
+  def test_response_html_helpers_and_image_extraction
+    html = <<~HTML
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Samba OG Shoes | adidas HK</title>
+        <meta name="description" content="Official adidas Samba OG shoes in brown." />
+        <meta property="og:image" content="https://assets.adidas.com/images/KI8139_01.jpg" />
+      </head>
+      <body>
+        <h1>adidas Originals</h1>
+        <img src="/images/logo.png" alt="Logo" />
+        <img data-src="https://assets.adidas.com/images/KI8139_02.jpg" />
+        <img srcset="https://assets.adidas.com/images/KI8139_03_small.jpg 450w, https://assets.adidas.com/images/KI8139_03_large.jpg 940w" />
+      </body>
+      </html>
+    HTML
+
+    raw = "HTTP/2 200 OK\r\ncontent-type: text/html; charset=utf-8\r\n\r\n#{html}"
+    response = HttpMimic::ResponseParser.new(raw, request_url: 'https://www.adidas.com.hk/en/KI8139.html').parse
+
+    assert_equal 'Samba OG Shoes | adidas HK', response.title
+    assert_equal 'Official adidas Samba OG shoes in brown.', response.meta_description
+    assert_equal 'https://assets.adidas.com/images/KI8139_01.jpg', response.og_image
+
+    images = response.extract_images
+    assert_includes images, 'https://www.adidas.com.hk/images/logo.png'
+    assert_includes images, 'https://assets.adidas.com/images/KI8139_01.jpg'
+    assert_includes images, 'https://assets.adidas.com/images/KI8139_02.jpg'
+    assert_includes images, 'https://assets.adidas.com/images/KI8139_03_large.jpg'
+  end
+
+  def test_mobile_and_os_binary_targets
+    android_builder = HttpMimic::CommandBuilder.new(:get, 'https://example.com', { profile: :android })
+    binary_android, = android_builder.build
+    assert_match(/(chrome131_android|chrome99_android|chrome|curl)/, binary_android)
+
+    ios_builder = HttpMimic::CommandBuilder.new(:get, 'https://example.com', { profile: :ios })
+    binary_ios, = ios_builder.build
+    assert_match(/(safari260_ios|safari180_ios|safari184_ios|safari|curl)/, binary_ios)
+  end
 end

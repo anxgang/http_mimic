@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.2] - 2026-08-29
+
+### Added
+- **Mobile Impersonation & Multi-Stage Auto-Fallback**:
+  - Added support for mobile browser targets: Android Chrome (`chrome131_android`, `chrome99_android`, alias `android`) and iOS Safari (`safari260_ios`, `safari180_ios`, `safari184_ios`, `safari172_ios`, alias `ios`, `mobile`).
+  - Enhanced `:auto` adaptive mode with automatic fallback cascade `[:impersonate, :android, :ios, :curl]` to bypass modern anti-bot systems (e.g. Akamai Bot Manager on Adidas HK) without requiring JavaScript telemetry solving.
+  - Added execution modes: `:mobile_first`, `:android_first`, `:ios_first`, `:mobile_only`, `:android_only`, `:ios_only`.
+- **Binary-Safe Response Parsing & File Saving**:
+  - Fixed binary handling in `ResponseParser#split_headers_and_body` to prevent `ArgumentError: invalid byte sequence in UTF-8` on images, PDFs, compressed files, and binary streams.
+  - Added `response.binary?` and `response.save_to_file(path)` / `response.save(path)` helpers.
+- **Built-in HTML / Scraping Helpers**:
+  - Added `response.title`, `response.og_image`, `response.meta_description`, and `response.extract_images(base_url: nil)`.
+
 ## [0.3.1] - 2026-08-25
 
 ### Added

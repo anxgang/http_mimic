@@ -73,6 +73,17 @@ class TestLiveFingerprint < Minitest::Test
     assert response.fallback_triggered?
   end
 
+  def test_smart_auto_fallback_on_adidas_akamai_protected_site
+    url = 'https://www.adidas.com.hk/en/KI8139.html'
+    response = fetch_with_retry(url, timeout: 25)
+    skip 'Adidas HK endpoint is temporarily unreachable' if response.code.zero?
+
+    assert_equal 200, response.code
+    assert response.success?
+    assert_includes %i[android ios mobile curl], response.mode_used
+    assert response.extract_images.size > 0
+  end
+
   private
 
   def fetch_with_retry(url, options = {}, max_retries = 2)

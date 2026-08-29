@@ -2,7 +2,9 @@
 
 module HttpMimic
   class Configuration
+    # Browser simulation & request defaults
     attr_accessor :default_impersonate
+    attr_accessor :default_mobile_impersonate
     attr_accessor :binary_path
     attr_accessor :fallback_to_curl
     attr_accessor :default_timeout
@@ -25,21 +27,22 @@ module HttpMimic
     attr_accessor :github_repo
 
     def initialize
-      @default_impersonate      = 'chrome131'
-      @binary_path              = nil
-      @fallback_to_curl         = true
-      @default_timeout          = 30
-      @default_connect_timeout  = 10
-      @follow_redirects         = true
-      @max_redirects            = 10
-      @raise_on_error           = false
-      @logger                   = nil
-      @debug                    = false
+      @default_impersonate         = 'chrome131'
+      @default_mobile_impersonate  = 'safari180_ios'
+      @binary_path                 = nil
+      @fallback_to_curl            = true
+      @default_timeout             = 30
+      @default_connect_timeout     = 10
+      @follow_redirects            = true
+      @max_redirects               = 10
+      @raise_on_error              = false
+      @logger                      = nil
+      @debug                       = false
 
-      # Multi-strategy defaults: :auto seamlessly falls back between impersonate and curl
-      @mode                     = :auto
-      @auto_fallback            = true
-      @retry_statuses           = [403, 429, 503]
+      # Multi-strategy defaults: :auto seamlessly falls back between impersonate, mobile, and curl
+      @mode                        = :auto
+      @auto_fallback               = true
+      @retry_statuses              = [403, 429, 503]
 
       # Enable automatic downloading of curl-impersonate driver (lexiforest) by default
       @auto_download            = true

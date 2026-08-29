@@ -83,17 +83,29 @@ module HttpMimic
     def determine_profiles(mode, auto_fallback)
       case mode
       when :curl, :curl_first
-        auto_fallback ? [:curl, :impersonate] : [:curl]
+        auto_fallback ? [:curl, :impersonate, :android, :ios] : [:curl]
       when :curl_only
         [:curl]
       when :impersonate_only
         [:impersonate]
+      when :mobile_only
+        [:mobile]
+      when :android_only
+        [:android]
+      when :ios_only
+        [:ios]
+      when :mobile_first
+        auto_fallback ? [:android, :ios, :impersonate, :curl] : [:mobile]
+      when :android_first
+        auto_fallback ? [:android, :ios, :impersonate, :curl] : [:android]
+      when :ios_first
+        auto_fallback ? [:ios, :android, :impersonate, :curl] : [:ios]
       when :impersonate_first
-        auto_fallback ? [:impersonate, :curl] : [:impersonate]
+        auto_fallback ? [:impersonate, :android, :ios, :curl] : [:impersonate]
       when :auto, :smart
-        auto_fallback ? [:impersonate, :curl] : [:impersonate]
+        auto_fallback ? [:impersonate, :android, :ios, :curl] : [:impersonate]
       else
-        auto_fallback ? [:impersonate, :curl] : [:impersonate]
+        auto_fallback ? [:impersonate, :android, :ios, :curl] : [:impersonate]
       end
     end
 

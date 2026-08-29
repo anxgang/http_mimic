@@ -67,6 +67,76 @@ module HttpMimic
       client_error? || server_error?
     end
 
+    def binary?
+      content_type = headers['content-type'].to_s.downcase
+      ResponseParser::BINARY_MIME_KEYWORDS.any? { |kw| content_type.include?(kw) } ||
+        body.to_s.b[0, 1024]&.include?("\x00".b)
+    end
+
+    def save_to_file(filepath)
+      require 'fileutils'
+      FileUtils.mkdir_p(File.dirname(filepath))
+      File.binwrite(filepath, body)
+      filepath
+    end
+    alias save save_to_file
+
+    def title
+      return nil if binary?
+      body[/<title[^>]*>(.*?)<\/title>/im, 1]&.strip
+    end
+
+    def og_image
+      return nil if binary?
+      body[/<meta\s+[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/im, 1] ||
+        body[/<meta\s+[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/im, 1]
+    end
+
+    def meta_description
+      return nil if binary?
+      body[/<meta\s+[^>]*name=["']description["'][^>]*content=["']([^"']+)["']/im, 1] ||
+        body[/<meta\s+[^>]*content=["']([^"']+)["'][^>]*name=["']description["']/im, 1]
+    end
+
+    def extract_images(base_url: nil)
+      return [] if binary?
+
+      base = base_url || request_url || ''
+      images = []
+
+      # 1. Match img tags (src, data-src, data-zoom-image, data-original, srcset)
+      body.scan(/<img\s+[^>]*>/i).each do |img_tag|
+        %w[src data-src data-zoom-image data-original data-high-res-src data-full-size-image-url].each do |attr|
+          if match = img_tag.match(/#{attr}=["']([^"']+)["']/i)
+            images << match[1].strip
+          end
+        end
+
+        if match = img_tag.match(/srcset=["']([^"']+)["']/i)
+          match[1].split(',').each do |item|
+            url = item.strip.split(/\s+/).first
+            images << url if url && !url.empty?
+          end
+        end
+      end
+
+      # 2. Match og:image meta tag
+      if og = og_image
+        images << og
+      end
+
+      # 3. Match raw image URLs found in document / script payloads
+      body.scan(/https?:[^\s"'<>]+\.(?:jpg|jpeg|png|webp|avif|gif)/i).each do |raw_url|
+        images << raw_url
+      end
+
+      # Clean, resolve relative URLs to absolute, and deduplicate
+      images.map do |img|
+        clean_url = img.gsub(/&amp;/, '&').strip
+        resolve_url(clean_url, base)
+      end.compact.reject(&:empty?).uniq
+    end
+
     def [](key)
       if parsed_response.is_a?(Hash) || parsed_response.is_a?(Array)
         parsed_response[key]
@@ -90,6 +160,20 @@ module HttpMimic
 
     def inspect
       "#<#{self.class.name}:0x#{object_id.to_s(16)} @code=#{code} @status_message=#{status_message.inspect} @headers=#{headers.to_h.inspect} @parsed_response=#{parsed_response.inspect}>"
+    end
+
+    private
+
+    def resolve_url(url, base)
+      return nil if url.nil? || url.empty? || url.start_with?('data:', 'javascript:', 'blob:', '#')
+      return url if url =~ /\Ahttps?:\/\//i
+      return "https:#{url}" if url.start_with?('//')
+
+      return url if base.nil? || base.empty?
+      require 'uri'
+      URI.join(base, url).to_s
+    rescue URI::InvalidURIError
+      url
     end
 
     def method_missing(method_name, *args, &block)

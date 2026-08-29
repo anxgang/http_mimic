@@ -161,24 +161,27 @@ response = client.post('/v1/users', json: { username: 'bob' })
 
 ## 🧠 Smart Adaptive Modes (Zero-Configuration Scraping)
 
-`HttpMimic` provides built-in multi-strategy orchestration so you can fetch protected websites without worrying about which specific WAF (Cloudflare, Akamai, DataDome) protects them:
+`HttpMimic` provides built-in multi-strategy orchestration so you can fetch protected websites without worrying about which specific WAF (Akamai Botman, Cloudflare Turnstile, DataDome, Kasada) protects them:
 
-- **`:auto` (Default & Recommended)**: Tries `curl-impersonate` (Chrome 131) first. If blocked by WAFs like Akamai with `403`/`429`/`503` (which require JS telemetry for browsers but allow standard server clients), it **automatically and seamlessly retries with standard curl + server headers**, directly returning `200 OK`.
-- **`:impersonate_first`**: Prefers `curl-impersonate` and automatically falls back to standard `curl` if blocked.
-- **`:curl_first`**: Prefers standard `curl` and automatically upgrades to `curl-impersonate` if blocked.
-- **`:impersonate_only`**: Strictly uses `curl-impersonate` (no retry/fallback).
-- **`:curl_only`**: Strictly uses standard `curl` (no retry/fallback).
+- **`:auto` (Default & Recommended)**: Tries desktop `curl-impersonate` (`chrome131`) first. If blocked by WAFs like Akamai with `403`/`429`/`503` (which require JS telemetry for desktop browsers), it **automatically cascades through mobile profiles (`android`, `ios`) and server `curl` headers**, reliably retrieving `200 OK`.
+- **`:mobile_first` / `:android_first` / `:ios_first`**: Prefers mobile TLS/HTTP2 fingerprints and falls back to desktop or curl if blocked.
+- **`:impersonate_first`**: Prefers desktop `curl-impersonate` and automatically falls back to mobile and curl if blocked.
+- **`:curl_first`**: Prefers standard server `curl` and automatically upgrades to impersonate profiles if blocked.
+- **`:impersonate_only` / `:mobile_only` / `:curl_only`**: Strictly uses the chosen profile (no fallback).
 
 ```ruby
-# 1. No-Brain Auto Mode (Works automatically for both Cloudflare & Akamai):
-response = HttpMimic.get('https://www.asics.com/us/en-us/gt-2000-15/p/ANA_1011C235-750.html')
+# 1. No-Brain Auto Mode (Works automatically for Cloudflare, Akamai, etc.):
+response = HttpMimic.get('https://www.adidas.com.hk/en/KI8139.html')
 puts response.code                 # => 200
-puts response.mode_used            # => :curl
+puts response.mode_used            # => :android
 puts response.fallback_triggered?  # => true
 
-# 2. Per-request mode override:
-response = HttpMimic.get(url, mode: :curl_first)
-response = HttpMimic.get(url, mode: :impersonate_only)
+# 2. Extract images and metadata with built-in helpers:
+puts response.title                # => "SAMBA OG SHOES - Brown | adidas Hong Kong"
+images = response.extract_images   # => ["https://assets.adidas.com/images/.../KI8139_01_00_standard.jpg", ...]
+
+# 3. Fetch and save binary images directly:
+HttpMimic.get(images.first).save('samba_og.jpg')
 ```
 
 ---
@@ -257,10 +260,18 @@ response.redirect?      # => false (3xx)
 response.client_error?  # => false (4xx)
 response.server_error?  # => false (5xx)
 
-# Response body
-response.body           # => Raw Body (String)
+# Response body & File operations
+response.body           # => Raw Body (String / binary bytes)
+response.binary?        # => true if content is an image, pdf, or binary stream
+response.save('image.jpg') # => Directly saves response body to file
 response.parsed_response# => Auto-parsed JSON Hash / Array
 response['key']         # => Direct key access to parsed_response
+
+# HTML & Scraping Helpers
+response.title          # => HTML page title
+response.og_image       # => OpenGraph image URL
+response.meta_description # => Meta description
+response.extract_images # => Array of all resolved image URLs in HTML
 
 # Headers & Cookies
 response.headers['content-type'] # => Case-insensitive header access
@@ -268,7 +279,7 @@ response.cookies['session_id']   # => Parsed Set-Cookie store
 response.history                 # => Array of redirect history metadata
 
 # Underlying execution & multi-strategy details
-response.mode_used            # => :impersonate or :curl
+response.mode_used            # => :impersonate, :android, :ios, or :curl
 response.fallback_triggered?  # => true if smart fallback was executed
 response.attempts             # => Array of execution metadata for each attempt
 response.exit_code            # => Process exit status (0 for success)
