@@ -16,6 +16,9 @@ module HttpMimic
     DEFAULT_QJS_REPO    = 'quickjs-ng/quickjs'
     DEFAULT_QJS_VERSION = 'v0.16.2'
 
+    DEFAULT_OBSCURA_REPO    = 'h4ckf0r0day/obscura'
+    DEFAULT_OBSCURA_VERSION = 'v0.2.1'
+
     class DownloadError < HttpMimic::Error; end
     class UnsupportedPlatformError < HttpMimic::Error; end
 
@@ -163,6 +166,100 @@ module HttpMimic
 
       def qjs_version_file_path(dir)
         File.join(dir, '.qjs_version')
+      end
+
+      def download_obscura!(version: nil, install_dir: nil, repo: nil, force: false)
+        target_version = normalize_version(version || HttpMimic.configuration.obscura_version || DEFAULT_OBSCURA_VERSION)
+        target_dir     = File.expand_path(install_dir || HttpMimic.configuration.install_dir)
+        target_repo    = repo || HttpMimic.configuration.obscura_github_repo || DEFAULT_OBSCURA_REPO
+
+        FileUtils.mkdir_p(target_dir)
+
+        dest_binary = File.join(target_dir, binary_name_for_platform('obscura'))
+
+        if !force && obscura_installed?(version: target_version, install_dir: target_dir)
+          log_info("obscura #{target_version} is already installed in #{target_dir}")
+          return dest_binary
+        end
+
+        asset_name = obscura_platform_asset
+        download_url = "https://github.com/#{target_repo}/releases/download/#{target_version}/#{asset_name}"
+
+        log_info("Downloading Obscura (#{target_version}) [#{asset_name}]...")
+        archive_data = fetch_binary(download_url)
+
+        log_info("Extracting Obscura archive to #{target_dir}...")
+        extract_tar_gz(archive_data, target_dir)
+
+        # Ensure executable permissions on extracted binaries
+        %w[obscura obscura-worker].each do |name|
+          p = File.join(target_dir, binary_name_for_platform(name))
+          File.chmod(0755, p) if File.exist?(p)
+        end
+
+        File.write(obscura_version_file_path(target_dir), target_version)
+
+        log_info("Obscura #{target_version} installation complete! (#{dest_binary})")
+        dest_binary
+      end
+
+      def obscura_installed?(version: nil, install_dir: nil)
+        target_dir = File.expand_path(install_dir || HttpMimic.configuration.install_dir)
+        bin = File.join(target_dir, binary_name_for_platform('obscura'))
+        return false unless File.file?(bin) && File.executable?(bin)
+
+        if version
+          target_version = normalize_version(version)
+          v_file = obscura_version_file_path(target_dir)
+          return false unless File.file?(v_file)
+          return File.read(v_file).strip == target_version
+        end
+
+        true
+      end
+
+      def obscura_path(install_dir: nil)
+        return HttpMimic.configuration.obscura_path if HttpMimic.configuration.obscura_path && File.executable?(HttpMimic.configuration.obscura_path)
+
+        target_dir = File.expand_path(install_dir || HttpMimic.configuration.install_dir)
+        candidate = File.join(target_dir, binary_name_for_platform('obscura'))
+        return candidate if File.file?(candidate) && File.executable?(candidate)
+
+        # Fallback to system PATH
+        sys_bin = `which obscura 2>/dev/null`.strip
+        return sys_bin if !sys_bin.empty? && File.executable?(sys_bin)
+
+        nil
+      end
+
+      def obscura_platform_asset
+        os  = host_os
+        cpu = host_cpu
+
+        case os
+        when :macos
+          case cpu
+          when :arm64 then 'obscura-aarch64-macos.tar.gz'
+          when :x86_64 then 'obscura-x86_64-macos.tar.gz'
+          else
+            raise UnsupportedPlatformError, "Unsupported macOS CPU architecture for Obscura: #{cpu}"
+          end
+        when :linux
+          case cpu
+          when :x86_64 then 'obscura-x86_64-linux.tar.gz'
+          when :aarch64, :arm64 then 'obscura-aarch64-linux.tar.gz'
+          else
+            raise UnsupportedPlatformError, "Unsupported Linux CPU architecture for Obscura: #{cpu}"
+          end
+        when :windows
+          'obscura-x86_64-windows.zip'
+        else
+          raise UnsupportedPlatformError, "Unsupported operating system for Obscura: #{RbConfig::CONFIG['host_os']}"
+        end
+      end
+
+      def obscura_version_file_path(dir)
+        File.join(dir, '.obscura_version')
       end
 
       def binary_path(name, install_dir: nil)

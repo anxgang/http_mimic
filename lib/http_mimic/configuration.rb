@@ -30,6 +30,12 @@ module HttpMimic
     attr_accessor :qjs_version
     attr_accessor :qjs_github_repo
 
+    # Obscura headless SPA engine settings
+    attr_accessor :obscura_version
+    attr_accessor :obscura_github_repo
+    attr_accessor :obscura_path
+    attr_accessor :auto_render_spa
+
     # WAF & JS challenge solving settings
     attr_accessor :auto_solve_waf
 
@@ -67,6 +73,15 @@ module HttpMimic
       # QuickJS defaults
       @qjs_version                 = 'v0.16.2'
       @qjs_github_repo             = 'quickjs-ng/quickjs'
+
+      # Obscura defaults (Lightweight Rust+V8 headless SPA engine)
+      # Temporarily points to 'anxgang/obscura' (v0.2.2) for Web Worker importScripts support.
+      # Will switch back to 'h4ckf0r0day/obscura' once upstream Pull Request is merged.
+      # @obscura_github_repo       = 'h4ckf0r0day/obscura'
+      @obscura_version             = 'v0.2.2'
+      @obscura_github_repo         = 'anxgang/obscura'
+      @obscura_path                = nil
+      @auto_render_spa             = false
 
       # WAF challenge solving defaults
       @auto_solve_waf              = true

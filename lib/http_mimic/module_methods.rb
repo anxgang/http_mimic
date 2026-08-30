@@ -46,6 +46,11 @@ module HttpMimic
       default_options[:persist_cookies] = enabled
     end
 
+    def auto_render_spa(enabled = nil)
+      return default_options[:auto_render_spa] if enabled.nil?
+      default_options[:auto_render_spa] = enabled
+    end
+
     def mode(m = nil)
       return default_options[:mode] if m.nil?
       default_options[:mode] = m
@@ -92,6 +97,12 @@ module HttpMimic
     def options(url, options = {})
       request(:options, url, options)
     end
+
+    def render(url, options = {})
+      merged = default_options.merge(options)
+      Obscura.render(url, merged)
+    end
+    alias spa render
 
     def request(method, url, options = {})
       merged = default_options.merge(options)

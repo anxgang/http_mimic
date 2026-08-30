@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-08-30
+
+### Added
+- **Tier 2: Obscura Headless SPA Rendering Support**:
+  - Native integration with [`h4ckf0r0day/obscura`](https://github.com/h4ckf0r0day/obscura)—a lightweight (<100MB) Rust + V8 headless browser engine with built-in stealth anti-detection.
+  - On-demand automatic driver management (`HttpMimic.download_obscura!`, `HttpMimic.obscura_installed?`, `HttpMimic.obscura_path`) across macOS (ARM64/x86_64), Linux (x86_64/aarch64), and Windows.
+  - New rendering helpers: `HttpMimic.render(url, options = {})` and `HttpMimic.spa(url, options = {})`.
+  - **Automatic SPA Detection & Transition (`auto_render_spa`)**:
+    - Intelligent `HttpMimic::SpaDetector` detects unhydrated client-side SPA shells (React `#root`, Vue `#app`, Angular `<app-root>`, Google Dynamic SERP, `<noscript>` prompts).
+    - When `auto_render_spa: true` (or `config.auto_render_spa = true`) is enabled, `HttpMimic.get` automatically transitions from Tier 1 (HTTP) to Tier 2 (Obscura) to render the full dynamic DOM.
+  - Configurable options: `:wait_until` (`networkidle0`, `domcontentloaded`, `load`), `:timeout`, `:proxy`, `:eval`, `:dump`, `:selector`, `:user_agent`, and `:stealth`.
+
 ## [0.4.1] - 2026-08-30
 
 ### Added

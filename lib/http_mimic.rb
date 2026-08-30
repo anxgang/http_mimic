@@ -19,6 +19,8 @@ require 'http_mimic/module_methods'
 require 'http_mimic/js_runtime'
 require 'http_mimic/waf'
 require 'http_mimic/cookie_store'
+require 'http_mimic/obscura'
+require 'http_mimic/spa_detector'
 
 module HttpMimic
   extend ModuleMethods
@@ -92,6 +94,30 @@ module HttpMimic
 
     def clear_cookies!(host = nil)
       CookieStore.clear(host)
+    end
+
+    # Obscura headless SPA engine helpers
+    def download_obscura!(version: nil, force: false)
+      Downloader.download_obscura!(version: version, force: force)
+    end
+
+    def obscura_installed?(version: nil)
+      Downloader.obscura_installed?(version: version)
+    end
+
+    def obscura_path
+      Downloader.obscura_path
+    end
+
+    # Render SPA page using Obscura headless engine
+    def render(url, options = {})
+      Obscura.render(url, options)
+    end
+    alias spa render
+
+    # Check if a response represents an unhydrated SPA shell
+    def spa?(response)
+      SpaDetector.spa?(response)
     end
 
     def included(base)

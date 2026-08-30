@@ -15,6 +15,12 @@ module HttpMimic
 
     def perform
       mode = (options[:mode] || config.mode || :auto).to_sym
+
+      # Delegate directly to Obscura headless SPA renderer if requested
+      if options[:render] == :spa || options[:render] == :obscura || mode == :spa || mode == :obscura
+        return Obscura.render(url, options)
+      end
+
       auto_fallback = options.fetch(:auto_fallback, config.auto_fallback)
       retry_statuses = options[:retry_statuses] || config.retry_statuses || [403, 429, 503]
 
@@ -111,6 +117,22 @@ module HttpMimic
         end
 
         log_debug("[HttpMimic] Attempt #{index + 1} with #{profile} resulted in status #{response.code}. Triggering smart fallback to next profile...")
+      end
+
+      # Automatic SPA Detection & Obscura rendering fallback
+      auto_render_spa = options.fetch(:auto_render_spa, config.auto_render_spa)
+      if auto_render_spa && response && response.success? && method.to_s.upcase == 'GET'
+        if SpaDetector.spa?(response)
+          log_debug("[HttpMimic] Detected unhydrated SPA shell on #{url}. Automatically rendering with Obscura...")
+          begin
+            rendered_resp = Obscura.render(url, options)
+            if rendered_resp && rendered_resp.success?
+              response = rendered_resp
+            end
+          rescue StandardError => e
+            log_debug("[HttpMimic] Automatic Obscura SPA render failed (#{e.message}), keeping Tier 1 response.")
+          end
+        end
       end
 
       # Persist cookies back to store if enabled

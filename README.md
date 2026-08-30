@@ -287,6 +287,47 @@ end
 | `:bearer_token` | String | Appends `Authorization: Bearer <token>` header |
 | `:insecure` | Boolean | Disable SSL certificate verification (`-k`) |
 | `:curl_options` | Array / String | Additional raw curl arguments (e.g., `['--http2', '--compressed']`) |
+| `:auto_render_spa` | Boolean | Automatically detect unhydrated SPA shells and render via Obscura |
+| `:render` | Symbol | `:spa` or `:obscura` to explicitly render page via Obscura |
+
+---
+
+## ⚡ Obscura SPA Rendering (Tier 2 Engine)
+
+`http_mimic` provides native support for [`h4ckf0r0day/obscura`](https://github.com/h4ckf0r0day/obscura)—a lightweight, single-binary (<100MB) headless browser engine written in Rust with an embedded V8 JavaScript runtime and built-in stealth anti-detection capabilities.
+
+Obscura is auto-downloaded on-demand into `~/.http_mimic/bin/obscura` when SPA rendering is requested.
+
+### 1. Automatic SPA Detection & Rendering (`auto_render_spa`)
+
+Similar to `auto_solve_waf`, when `auto_render_spa: true` is enabled, `HttpMimic` first sends a microsecond-fast HTTP request (Tier 1). If the response is detected as an unhydrated SPA shell (empty React `#root`, Vue `#app`, Angular `<app-root>`, Google Dynamic SERP, or `<noscript>` prompt), it automatically transitions to Obscura (Tier 2) to render the full DOM tree:
+
+```ruby
+# Auto-detects SPA shell and seamlessly renders with Obscura
+response = HttpMimic.get('https://example.com/spa', auto_render_spa: true)
+
+puts response.code    # => 200
+puts response.title   # => Fully hydrated DOM title
+puts response.body    # => Fully rendered HTML with client-side injected DOM nodes
+```
+
+### 2. Direct SPA Rendering
+
+```ruby
+# Direct SPA render
+response = HttpMimic.render('https://example.com/spa')
+
+# or via alias:
+response = HttpMimic.spa('https://example.com/spa')
+```
+
+**Supported Options**:
+- `:wait_until` - `'load'`, `'domcontentloaded'`, `'networkidle0'` (default: `'networkidle0'`)
+- `:timeout` - execution deadline in seconds (default: 30)
+- `:proxy` - proxy address (`socks5://...` or `http://...`)
+- `:eval` - JavaScript expression to evaluate in page context
+- `:dump` - output format: `'html'` (default), `'text'`, `'links'`, `'markdown'`, `'cookies'`
+- `:stealth` - whether stealth anti-detection is enabled (default: `true`)
 
 ---
 
