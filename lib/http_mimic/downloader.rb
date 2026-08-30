@@ -13,6 +13,9 @@ module HttpMimic
     DEFAULT_GITHUB_REPO = 'lexiforest/curl-impersonate'
     DEFAULT_VERSION     = 'v2.1.1'
 
+    DEFAULT_QJS_REPO    = 'quickjs-ng/quickjs'
+    DEFAULT_QJS_VERSION = 'v0.16.2'
+
     class DownloadError < HttpMimic::Error; end
     class UnsupportedPlatformError < HttpMimic::Error; end
 
@@ -61,6 +64,105 @@ module HttpMimic
         end
 
         true
+      end
+
+      def download_qjs!(version: nil, install_dir: nil, repo: nil, force: false)
+        target_version = normalize_version(version || HttpMimic.configuration.qjs_version || DEFAULT_QJS_VERSION)
+        target_dir     = File.expand_path(install_dir || HttpMimic.configuration.install_dir)
+        target_repo    = repo || HttpMimic.configuration.qjs_github_repo || DEFAULT_QJS_REPO
+
+        FileUtils.mkdir_p(target_dir)
+
+        dest_binary = File.join(target_dir, binary_name_for_platform('qjs'))
+
+        if !force && qjs_installed?(version: target_version, install_dir: target_dir)
+          log_info("qjs #{target_version} is already installed in #{target_dir}")
+          return dest_binary
+        end
+
+        asset_name = qjs_platform_asset
+        download_url = "https://github.com/#{target_repo}/releases/download/#{target_version}/#{asset_name}"
+
+        log_info("Downloading QuickJS (#{target_version}) [#{asset_name}]...")
+        binary_data = fetch_binary(download_url)
+
+        File.binwrite(dest_binary, binary_data)
+        File.chmod(0755, dest_binary)
+
+        File.write(qjs_version_file_path(target_dir), target_version)
+
+        log_info("QuickJS #{target_version} installation complete! (#{dest_binary})")
+        dest_binary
+      end
+
+      def qjs_installed?(version: nil, install_dir: nil)
+        target_dir = File.expand_path(install_dir || HttpMimic.configuration.install_dir)
+        qjs_bin = File.join(target_dir, binary_name_for_platform('qjs'))
+        return false unless File.file?(qjs_bin) && File.executable?(qjs_bin)
+
+        if version
+          target_version = normalize_version(version)
+          v_file = qjs_version_file_path(target_dir)
+          return false unless File.file?(v_file)
+          return File.read(v_file).strip == target_version
+        end
+
+        true
+      end
+
+      def qjs_path(install_dir: nil)
+        target_dir = File.expand_path(install_dir || HttpMimic.configuration.install_dir)
+        candidate = File.join(target_dir, binary_name_for_platform('qjs'))
+        return candidate if File.file?(candidate) && File.executable?(candidate)
+
+        # Fallback to system PATH
+        sys_qjs = `which qjs 2>/dev/null`.strip
+        return sys_qjs if !sys_qjs.empty? && File.executable?(sys_qjs)
+
+        nil
+      end
+
+      def qjs_platform_asset
+        os  = host_os
+        cpu = host_cpu
+
+        case os
+        when :macos
+          case cpu
+          when :arm64 then 'qjs-darwin-arm64'
+          when :x86_64 then 'qjs-darwin-x86_64'
+          else
+            raise UnsupportedPlatformError, "Unsupported macOS CPU architecture for QuickJS: #{cpu}"
+          end
+        when :linux
+          case cpu
+          when :x86_64
+            'qjs-linux-x86_64'
+          when :aarch64, :arm64
+            'qjs-linux-aarch64'
+          when :arm
+            'qjs-linux-armv7'
+          when :i386, :i686
+            'qjs-linux-x86'
+          when :riscv64
+            'qjs-linux-riscv64'
+          else
+            raise UnsupportedPlatformError, "Unsupported Linux CPU architecture for QuickJS: #{cpu}"
+          end
+        when :windows
+          case cpu
+          when :x86_64 then 'qjs-windows-x86_64.exe'
+          when :i386, :i686 then 'qjs-windows-x86.exe'
+          else
+            raise UnsupportedPlatformError, "Unsupported Windows CPU architecture for QuickJS: #{cpu}"
+          end
+        else
+          raise UnsupportedPlatformError, "Unsupported operating system for QuickJS: #{RbConfig::CONFIG['host_os']}"
+        end
+      end
+
+      def qjs_version_file_path(dir)
+        File.join(dir, '.qjs_version')
       end
 
       def binary_path(name, install_dir: nil)

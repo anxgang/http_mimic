@@ -41,6 +41,11 @@ module HttpMimic
       default_options[:cookies].merge!(c)
     end
 
+    def persist_cookies(enabled = nil)
+      return default_options[:persist_cookies] if enabled.nil?
+      default_options[:persist_cookies] = enabled
+    end
+
     def mode(m = nil)
       return default_options[:mode] if m.nil?
       default_options[:mode] = m

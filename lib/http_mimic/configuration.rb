@@ -26,6 +26,20 @@ module HttpMimic
     attr_accessor :install_dir
     attr_accessor :github_repo
 
+    # QuickJS standalone binary management settings
+    attr_accessor :qjs_version
+    attr_accessor :qjs_github_repo
+
+    # WAF & JS challenge solving settings
+    attr_accessor :auto_solve_waf
+
+    # Shared Host-based CookieStore settings
+    attr_accessor :persist_cookies
+    attr_accessor :cookie_store_dir
+
+    # Modern Navigation Headers simulation
+    attr_accessor :navigation_headers
+
     def initialize
       @default_impersonate         = 'chrome131'
       @default_mobile_impersonate  = 'safari180_ios'
@@ -45,10 +59,24 @@ module HttpMimic
       @retry_statuses              = [403, 429, 503]
 
       # Enable automatic downloading of curl-impersonate driver (lexiforest) by default
-      @auto_download            = true
-      @driver_version           = 'v2.1.1'
-      @install_dir              = File.expand_path('~/.http_mimic/bin')
-      @github_repo              = 'lexiforest/curl-impersonate'
+      @auto_download               = true
+      @driver_version              = 'v2.1.1'
+      @install_dir                 = File.expand_path('~/.http_mimic/bin')
+      @github_repo                 = 'lexiforest/curl-impersonate'
+
+      # QuickJS defaults
+      @qjs_version                 = 'v0.16.2'
+      @qjs_github_repo             = 'quickjs-ng/quickjs'
+
+      # WAF challenge solving defaults
+      @auto_solve_waf              = true
+
+      # Shared Host CookieStore defaults
+      @persist_cookies             = false
+      @cookie_store_dir            = File.expand_path('~/.http_mimic/cookies')
+
+      # Navigation Headers defaults
+      @navigation_headers          = true
     end
   end
 end

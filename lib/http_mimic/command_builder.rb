@@ -208,6 +208,13 @@ module HttpMimic
         headers_to_send['Accept'] ||= '*/*'
         headers_to_send['Accept-Encoding'] ||= 'gzip;q=1.0,deflate;q=0.6,identity;q=0.3'
         headers_to_send['Connection'] ||= 'close'
+      else
+        # Automatic Navigation Headers for browser profiles on GET/HEAD
+        nav_headers_enabled = options.fetch(:navigation_headers, config.navigation_headers)
+        if nav_headers_enabled && %i[get head].include?(method.to_s.downcase.to_sym)
+          target = resolve_target
+          apply_navigation_headers(headers_to_send, target)
+        end
       end
 
       # Append headers
@@ -232,7 +239,20 @@ module HttpMimic
       [binary, args, stdin_data, final_url]
     end
 
-    def resolve_binary
+    def resolve_target
+      case options[:profile]
+      when :android
+        (options[:android_impersonate] || 'chrome131_android').to_s.downcase
+      when :ios
+        (options[:ios_impersonate] || 'safari260_ios').to_s.downcase
+      when :mobile
+        (options[:mobile_impersonate] || 'chrome131_android').to_s.downcase
+      else
+        (options[:impersonate] || config.default_impersonate).to_s.downcase
+      end
+    end
+
+    def resolve_binary(target = resolve_target)
       # 0. If profile is explicitly set to :curl, use system curl
       if options[:profile] == :curl
         curl_path = find_executable('curl') || 'curl'
@@ -248,16 +268,6 @@ module HttpMimic
         raise BinaryNotFoundError, "Specified executable does not exist or is not executable: #{explicit}"
       end
 
-      target = case options[:profile]
-               when :android
-                 (options[:android_impersonate] || 'chrome131_android').to_s.downcase
-               when :ios
-                 (options[:ios_impersonate] || 'safari260_ios').to_s.downcase
-               when :mobile
-                 (options[:mobile_impersonate] || 'chrome131_android').to_s.downcase
-               else
-                 (options[:impersonate] || config.default_impersonate).to_s.downcase
-               end
       candidate_names = TARGET_BINARY_MAP[target] || ["curl_#{target}", target]
 
       # 2. Check local installation directory (~/.http_mimic/bin)
@@ -303,6 +313,81 @@ module HttpMimic
     end
 
     private
+
+    def apply_navigation_headers(headers_to_send, target)
+      target_str = target.to_s.downcase
+
+      if target_str.start_with?('firefox', 'ff')
+        # Firefox (Gecko): Mozilla does not send Client Hints (sec-ch-ua*)
+        headers_to_send['sec-fetch-dest'] ||= 'document'
+        headers_to_send['sec-fetch-mode'] ||= 'navigate'
+        headers_to_send['sec-fetch-site'] ||= 'none'
+        headers_to_send['sec-fetch-user'] ||= '?1'
+        headers_to_send['upgrade-insecure-requests'] ||= '1'
+        headers_to_send['accept'] ||= 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8'
+        headers_to_send['accept-language'] ||= 'en-US,en;q=0.5'
+
+      elsif target_str.start_with?('safari') || target_str == 'ios' || target_str == 'safari_ios' || target_str.include?('_ios')
+        # Safari / WebKit (Desktop & iOS): WebKit does not send Client Hints (sec-ch-ua*)
+        headers_to_send['sec-fetch-dest'] ||= 'document'
+        headers_to_send['sec-fetch-mode'] ||= 'navigate'
+        headers_to_send['sec-fetch-site'] ||= 'none'
+        headers_to_send['accept'] ||= 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+        headers_to_send['accept-language'] ||= 'en-US,en;q=0.9'
+
+      elsif target_str.start_with?('tor')
+        # Tor Browser: No sec-ch-ua headers
+        headers_to_send['sec-fetch-dest'] ||= 'document'
+        headers_to_send['sec-fetch-mode'] ||= 'navigate'
+        headers_to_send['sec-fetch-site'] ||= 'none'
+        headers_to_send['sec-fetch-user'] ||= '?1'
+        headers_to_send['upgrade-insecure-requests'] ||= '1'
+        headers_to_send['accept'] ||= 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+        headers_to_send['accept-language'] ||= 'en-US,en;q=0.5'
+
+      elsif target_str.start_with?('edge')
+        # Edge (Chromium): Microsoft Edge sec-ch-ua
+        ver = target_str[/\d+/] || '101'
+        headers_to_send['sec-ch-ua'] ||= "\"Microsoft Edge\";v=\"#{ver}\", \"Chromium\";v=\"#{ver}\", \"Not_A Brand\";v=\"24\""
+        headers_to_send['sec-ch-ua-mobile'] ||= '?0'
+        headers_to_send['sec-ch-ua-platform'] ||= '"Windows"'
+        headers_to_send['sec-fetch-dest'] ||= 'document'
+        headers_to_send['sec-fetch-mode'] ||= 'navigate'
+        headers_to_send['sec-fetch-site'] ||= 'none'
+        headers_to_send['sec-fetch-user'] ||= '?1'
+        headers_to_send['upgrade-insecure-requests'] ||= '1'
+        headers_to_send['accept'] ||= 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7'
+        headers_to_send['accept-language'] ||= 'en-US,en;q=0.9'
+
+      elsif target_str.include?('android')
+        # Android Chrome
+        ver = target_str[/\d+/] || '131'
+        headers_to_send['sec-ch-ua'] ||= "\"Chromium\";v=\"#{ver}\", \"Not_A Brand\";v=\"24\", \"Google Chrome\";v=\"#{ver}\""
+        headers_to_send['sec-ch-ua-mobile'] ||= '?1'
+        headers_to_send['sec-ch-ua-platform'] ||= '"Android"'
+        headers_to_send['sec-fetch-dest'] ||= 'document'
+        headers_to_send['sec-fetch-mode'] ||= 'navigate'
+        headers_to_send['sec-fetch-site'] ||= 'none'
+        headers_to_send['sec-fetch-user'] ||= '?1'
+        headers_to_send['upgrade-insecure-requests'] ||= '1'
+        headers_to_send['accept'] ||= 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7'
+        headers_to_send['accept-language'] ||= 'en-US,en;q=0.9'
+
+      else
+        # Chrome Desktop (Default)
+        ver = target_str[/\d+/] || '131'
+        headers_to_send['sec-ch-ua'] ||= "\"Google Chrome\";v=\"#{ver}\", \"Chromium\";v=\"#{ver}\", \"Not_A Brand\";v=\"24\""
+        headers_to_send['sec-ch-ua-mobile'] ||= '?0'
+        headers_to_send['sec-ch-ua-platform'] ||= '"macOS"'
+        headers_to_send['sec-fetch-dest'] ||= 'document'
+        headers_to_send['sec-fetch-mode'] ||= 'navigate'
+        headers_to_send['sec-fetch-site'] ||= 'none'
+        headers_to_send['sec-fetch-user'] ||= '?1'
+        headers_to_send['upgrade-insecure-requests'] ||= '1'
+        headers_to_send['accept'] ||= 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7'
+        headers_to_send['accept-language'] ||= 'en-US,en;q=0.9'
+      end
+    end
 
     def find_in_download_dir(candidates)
       target_dir = File.expand_path(config.install_dir)

@@ -18,8 +18,22 @@ module HttpMimic
       auto_fallback = options.fetch(:auto_fallback, config.auto_fallback)
       retry_statuses = options[:retry_statuses] || config.retry_statuses || [403, 429, 503]
 
+      # Persistent CookieStore integration
+      should_persist_cookie = options.fetch(:persist_cookies, config.persist_cookies)
+      host = CookieStore.extract_host(url)
+
+      if should_persist_cookie && host
+        stored_cookies = CookieStore.load(host)
+        if stored_cookies && !stored_cookies.empty?
+          log_debug("[HttpMimic::CookieStore] Loaded #{stored_cookies.size} persistent cookies for #{host}")
+          user_cookies = options[:cookies] ? (options[:cookies].is_a?(Hash) ? options[:cookies] : options[:cookies].to_h) : {}
+          options[:cookies] = stored_cookies.merge(user_cookies)
+        end
+      end
+
       attempts = []
       profiles_to_try = determine_profiles(mode, auto_fallback)
+      waf_solve_attempted = false
 
       response = nil
       final_status = nil
@@ -66,12 +80,43 @@ module HttpMimic
         final_stderr = stderr
         final_command = full_command
 
-        is_blocked = (status.exitstatus != 0) || retry_statuses.include?(response.code)
+        # Forward any received cookies to subsequent attempts
+        if response.cookies && !response.cookies.empty?
+          existing_cookies = options[:cookies] ? (options[:cookies].is_a?(Hash) ? options[:cookies] : options[:cookies].to_h) : {}
+          options[:cookies] = response.cookies.to_h.merge(existing_cookies)
+        end
+
+        auto_solve_waf = options.fetch(:solve_waf, config.auto_solve_waf)
+        is_blocked = (status.exitstatus != 0) || retry_statuses.include?(response.code) || Waf::Detector.challenge_page?(response)
+
+        # Only attempt WAF resolution once per request to avoid unnecessary latency on subsequent fallbacks
+        if is_blocked && auto_solve_waf && !waf_solve_attempted && method.to_s.upcase == 'GET'
+          waf_type = Waf::Detector.detect(response)
+          if waf_type
+            waf_solve_attempted = true
+            log_debug("[HttpMimic] Detected #{waf_type.to_s.capitalize} WAF challenge. Attempting to solve with QuickJS...")
+            solved_resp = Waf.solve(url, response, current_opts)
+            if solved_resp
+              response = solved_resp
+              is_blocked = (response.code != 0 && retry_statuses.include?(response.code))
+              if response.cookies && !response.cookies.empty?
+                options[:cookies] = (options[:cookies] || {}).merge(response.cookies.to_h)
+              end
+            end
+          end
+        end
+
         if !is_blocked || (index == profiles_to_try.size - 1)
           break
         end
 
         log_debug("[HttpMimic] Attempt #{index + 1} with #{profile} resulted in status #{response.code}. Triggering smart fallback to next profile...")
+      end
+
+      # Persist cookies back to store if enabled
+      if should_persist_cookie && host && response && response.cookies && !response.cookies.empty?
+        CookieStore.save(host, response.cookies)
+        log_debug("[HttpMimic::CookieStore] Saved #{response.cookies.size} cookies for #{host}")
       end
 
       handle_errors(final_status, final_stderr, final_command, response)

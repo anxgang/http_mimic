@@ -47,6 +47,44 @@ module HttpMimic
       @store.values
     end
 
+    def empty?
+      @store.empty?
+    end
+
+    def size
+      @store.size
+    end
+    alias length size
+
+    def delete(name)
+      @cookie_items.delete(name.to_s)
+      @store.delete(name.to_s)
+    end
+
+    def clear
+      @cookie_items.clear
+      @store.clear
+    end
+
+    def merge(other)
+      dup_cookies = self.class.new(@store)
+      if other.is_a?(Cookies)
+        other.each { |k, v| dup_cookies[k] = v }
+      elsif other.is_a?(Hash)
+        other.each { |k, v| dup_cookies[k] = v }
+      end
+      dup_cookies
+    end
+
+    def merge!(other)
+      if other.is_a?(Cookies)
+        other.each { |k, v| self[k] = v }
+      elsif other.is_a?(Hash)
+        other.each { |k, v| self[k] = v }
+      end
+      self
+    end
+
     def to_h
       @store.dup
     end

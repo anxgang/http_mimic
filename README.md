@@ -21,7 +21,7 @@ It also includes **Webdrivers-like automatic driver management**, automatically 
   - Edge & Tor support: `edge101`, `edge99`, `tor145`.
 - **HTTParty-Style API**:
   - Direct module methods: `HttpMimic.get`, `HttpMimic.post`, etc.
-  - Class mixin via `include HttpMimic` (`base_uri`, `headers`, `default_params`, `default_timeout`, `impersonate`, `proxy`, `cookies`).
+  - Class mixin via `include HttpMimic` (`base_uri`, `headers`, `default_params`, `default_timeout`, `impersonate`, `proxy`, `cookies`, `persist_cookies`).
   - Reusable instance client: `HttpMimic::Client.new(...)`.
 - **Zero Shell Injection Risk**:
   - Executes commands with array arguments via `Open3.capture3(*cmd_array)`.
@@ -186,6 +186,40 @@ HttpMimic.get(images.first).save('samba_og.jpg')
 
 ---
 
+## 🍪 Persistent Host CookieStore
+
+`HttpMimic` supports persistent host-based cookie caching. Once enabled, session and verification cookies are automatically saved to `~/.http_mimic/cookies/<host>.json` and reused in subsequent requests to the same host:
+
+```ruby
+# 1. Enable per-request
+response = HttpMimic.get('https://example.com/items', persist_cookies: true)
+
+# 2. Or enable in class mixin
+class Scraper
+  include HttpMimic
+  persist_cookies true
+end
+
+# 3. Manual CookieStore helpers
+HttpMimic.load_cookies('example.com')                  # => Hash of active cookies
+HttpMimic.save_cookies('example.com', { session: '123' }) # Save cookies with default TTL
+HttpMimic.clear_cookies!('example.com')                # Clear host or all cookies
+```
+
+---
+
+## 🧭 Target-Specific Navigation Headers & Client Hints
+
+`HttpMimic` automatically constructs browser-accurate HTTP navigation headers on `GET` and `HEAD` requests:
+
+- **Chrome Desktop / Mobile**: Generates `sec-ch-ua`, `sec-ch-ua-mobile`, `sec-ch-ua-platform`, and standard Chrome `Accept` headers.
+- **Firefox & Safari / iOS**: **Strictly omits** Chromium-only `sec-ch-ua*` headers to prevent anti-bot detection and fingerprint mismatch anomalies.
+- **Edge**: Generates Microsoft Edge brand `sec-ch-ua` headers.
+
+Can be disabled globally with `config.navigation_headers = false` or per request via `navigation_headers: false`.
+
+---
+
 ## ⚙️ Global Configuration
 
 Configure global defaults in an initializer (e.g., `config/initializers/http_mimic.rb`):
@@ -207,6 +241,16 @@ HttpMimic.configure do |config|
   config.raise_on_error          = false       # Raise exceptions on HTTP errors / non-zero exits
   config.debug                   = false       # Print debug logs
 
+  # Navigation headers & Client Hints simulation (enabled by default)
+  config.navigation_headers      = true        # Browser-accurate sec-ch-ua, sec-fetch-*, Accept headers
+
+  # Host CookieStore Persistence (disabled by default)
+  config.persist_cookies         = false                                     # Auto-persist cookies per host
+  config.cookie_store_dir        = File.expand_path('~/.http_mimic/cookies') # Directory for cookie store
+
+  # WAF challenge solving (enabled by default)
+  config.auto_solve_waf          = true        # Automatically solve detected WAF JS challenges
+
   # Webdrivers-like auto-download settings (enabled by default)
   config.auto_download           = true                                  # Auto-download missing binary
   config.driver_version          = 'v2.1.1'                              # Target release version
@@ -225,12 +269,15 @@ end
 | `:auto_fallback` | Boolean | Whether to automatically retry with alternative profile on blocked status (default `true`) |
 | `:retry_statuses`| Array | Status codes that trigger auto-fallback (default `[403, 429, 503]`) |
 | `:impersonate` | String | Target browser to mimic (e.g., `'chrome131'`, `'chrome120'`, `'firefox135'`, `'safari180'`, `'tor145'`) |
+| `:navigation_headers` | Boolean | Automatically generate browser-accurate navigation headers (`sec-ch-ua`, `sec-fetch-*`, `Accept`) (default `true`) |
+| `:solve_waf` | Boolean | Automatically detect and solve WAF challenges (e.g. Akamai) via embedded QuickJS (default `true`) |
 | `:binary` | String | Path to a custom `curl-impersonate` executable |
 | `:query` / `:params` | Hash | URL query parameters (supports nested parameters and encoding) |
 | `:headers` | Hash | Custom HTTP request headers |
 | `:json` | Hash / Array | Serialized to JSON with `Content-Type: application/json` |
 | `:body` | Hash / String | Form payload (Hash) or raw request body string |
 | `:cookies` | Hash / String | Request cookies |
+| `:persist_cookies` | Boolean | Automatically load and save cookies for the host across requests |
 | `:cookie_jar` | String | Path to save cookies (`-c`) |
 | `:cookie_file` | String | Path to read cookies (`-b`) |
 | `:timeout` | Integer / Float | Maximum execution timeout in seconds (`--max-time`) |

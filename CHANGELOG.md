@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-08-30
+
+### Added
+- **Target-Specific Navigation Headers & Client Hints Simulation**:
+  - Automatically generates browser-accurate Navigation Headers (`sec-fetch-dest`, `sec-fetch-mode`, `sec-fetch-site`, `upgrade-insecure-requests`) and Client Hints (`sec-ch-ua`, `sec-ch-ua-mobile`, `sec-ch-ua-platform`) tailored to the selected impersonation target.
+  - Firefox (`firefox*`, `ff*`), Safari / iOS (`safari*`, `ios*`), and Tor targets strictly omit Chromium-only `sec-ch-ua*` headers to avoid anti-bot fingerprint anomalies and detection.
+  - Android Chrome targets properly send `sec-ch-ua-mobile: ?1` and `sec-ch-ua-platform: "Android"`.
+  - Edge targets properly send `"Microsoft Edge"` brand headers with `"Windows"` platform.
+- **Unified Persistent CookieStore (`persist_cookies`)**:
+  - Added `:persist_cookies` request option and `persist_cookies` class-level DSL method to automatically load and persist session cookies across requests per host into `~/.http_mimic/cookies/`.
+  - Added helper methods: `HttpMimic.load_cookies(host, max_age: nil)`, `HttpMimic.save_cookies(host, cookies, ttl: nil)`, and `HttpMimic.clear_cookies!(host = nil)`.
+- **WAF Challenge Solving & Fallback Performance Optimizations**:
+  - Added single-pass WAF solver guard (`waf_solve_attempted`) to prevent redundant JavaScript solver executions across fallback attempts.
+  - Added cross-attempt cookie accumulation to preserve session state between fallback profiles.
+  - Added `HttpMimic::Waf::Detector.challenge_page?` to detect interstitial challenges disguised under HTTP 200 responses.
+
 ## [0.3.2] - 2026-08-29
 
 ### Added

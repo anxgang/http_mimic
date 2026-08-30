@@ -31,4 +31,19 @@ module HttpMimic
 
   # Raised when response parsing fails
   class ResponseParseError < Error; end
+
+  # Raised when JavaScript execution fails in JSRuntime
+  class JSError < Error
+    attr_reader :stderr, :exit_code
+
+    def initialize(message, stderr: nil, exit_code: nil)
+      super(message)
+      @stderr = stderr
+      @exit_code = exit_code
+    end
+  end
+
+  # Raised when JavaScript execution times out
+  class JSTimeoutError < JSError; end
 end
+
