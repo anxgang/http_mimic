@@ -239,20 +239,20 @@ module HttpMimic
         case os
         when :macos
           case cpu
-          when :arm64 then 'obscura-aarch64-macos.tar.gz'
-          when :x86_64 then 'obscura-x86_64-macos.tar.gz'
+          when :arm64 then 'obscura-aarch64-macos-stealth.tar.gz'
+          when :x86_64 then 'obscura-x86_64-macos-stealth.tar.gz'
           else
             raise UnsupportedPlatformError, "Unsupported macOS CPU architecture for Obscura: #{cpu}"
           end
         when :linux
           case cpu
-          when :x86_64 then 'obscura-x86_64-linux.tar.gz'
-          when :aarch64, :arm64 then 'obscura-aarch64-linux.tar.gz'
+          when :x86_64 then 'obscura-x86_64-linux-stealth.tar.gz'
+          when :aarch64, :arm64 then 'obscura-aarch64-linux-stealth.tar.gz'
           else
             raise UnsupportedPlatformError, "Unsupported Linux CPU architecture for Obscura: #{cpu}"
           end
         when :windows
-          'obscura-x86_64-windows.zip'
+          'obscura-x86_64-windows-stealth.zip'
         else
           raise UnsupportedPlatformError, "Unsupported operating system for Obscura: #{RbConfig::CONFIG['host_os']}"
         end
