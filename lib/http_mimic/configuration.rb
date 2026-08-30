@@ -75,10 +75,10 @@ module HttpMimic
       @qjs_github_repo             = 'quickjs-ng/quickjs'
 
       # Obscura defaults (Lightweight Rust+V8 headless SPA engine)
-      # Temporarily points to 'anxgang/obscura' (v0.2.2) for Web Worker importScripts support.
+      # Temporarily points to 'anxgang/obscura' (v0.2.3) for Web Worker importScripts support.
       # Will switch back to 'h4ckf0r0day/obscura' once upstream Pull Request is merged.
       # @obscura_github_repo       = 'h4ckf0r0day/obscura'
-      @obscura_version             = 'v0.2.2'
+      @obscura_version             = 'v0.2.3'
       @obscura_github_repo         = 'anxgang/obscura'
       @obscura_path                = nil
       @auto_render_spa             = false

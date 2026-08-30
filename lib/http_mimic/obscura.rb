@@ -57,6 +57,19 @@ module HttpMimic
           args << '--proxy' << options[:proxy].to_s
         end
 
+        # Cookies: pass cookies string or hash (Two-Phase Pipeline support)
+        if options[:cookies] || options[:cookie]
+          cookie_val = options[:cookies] || options[:cookie]
+          cookie_str = if cookie_val.is_a?(Hash)
+            cookie_val.map { |k, v| "#{k}=#{v}" }.join('; ')
+          elsif cookie_val.is_a?(Array)
+            cookie_val.join('; ')
+          else
+            cookie_val.to_s
+          end
+          args << '--cookie' << cookie_str unless cookie_str.empty?
+        end
+
         # Optional JS evaluation
         args << '--eval' << options[:eval].to_s if options[:eval]
 

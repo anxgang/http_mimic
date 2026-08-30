@@ -10,7 +10,7 @@ class ObscuraTest < Minitest::Test
 
   def test_obscura_configuration_defaults
     config = HttpMimic.configuration
-    assert_equal 'v0.2.2', config.obscura_version
+    assert_equal 'v0.2.3', config.obscura_version
     assert_equal 'anxgang/obscura', config.obscura_github_repo
     assert_nil config.obscura_path
   end

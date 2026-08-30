@@ -125,7 +125,14 @@ module HttpMimic
         if SpaDetector.spa?(response)
           log_debug("[HttpMimic] Detected unhydrated SPA shell on #{url}. Automatically rendering with Obscura...")
           begin
-            rendered_resp = Obscura.render(url, options)
+            spa_opts = options.dup
+            # Forward all validated cookies from Tier 1 (Mode 2: Two-Phase Pipeline)
+            if response.cookies && !response.cookies.empty?
+              tier1_cookies = response.cookies.to_h
+              existing_cookies = spa_opts[:cookies].is_a?(Hash) ? spa_opts[:cookies] : {}
+              spa_opts[:cookies] = existing_cookies.merge(tier1_cookies)
+            end
+            rendered_resp = Obscura.render(url, spa_opts)
             if rendered_resp && rendered_resp.success?
               response = rendered_resp
             end
