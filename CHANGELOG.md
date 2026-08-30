@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.1] - 2026-08-30
+
+### Added
+- **Two-Phase Cookie & State Pipeline (Tier 1 ➔ Tier 2)**:
+  - Automatically forward validated cookies (`NID`, `AEC`, `_abck`, `cf_clearance`) and custom headers from Tier 1 HTTP / WAF resolution directly into Obscura (`--cookie` flag) during `auto_render_spa` transitions.
+- **Obscura Stealth BoringSSL Integration**:
+  - Downloader now defaults to `*-stealth.tar.gz` release assets, equipping Obscura with native BoringSSL Chrome TLS / JA4 fingerprint impersonation.
+- **Upgraded Obscura to `anxgang/obscura` v0.2.3**:
+  - WebGL context, `REAL_FONT_METRICS` font measurements, and persistent Web Worker `importScripts` support.
+
 ## [0.5.0] - 2026-08-30
 
 ### Added
