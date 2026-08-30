@@ -89,4 +89,13 @@ class WafTest < Minitest::Test
     assert_equal custom_ua, result['ua']
     assert_equal 'Win32', result['platform']
   end
+
+  def test_google_detection
+    raw = "HTTP/2 200 OK\r\nserver: gws\r\n\r\n<!DOCTYPE html><html><body><noscript><meta http-equiv=\"refresh\" content=\"0;url=/httpservice/retry/enablejs?sei=123\"></noscript></body></html>"
+    resp = HttpMimic::ResponseParser.new(raw).parse
+
+    assert_equal :google, HttpMimic.detect_waf(resp)
+    assert_equal :google, HttpMimic::Waf::Detector.detect(resp)
+    assert HttpMimic::Waf::Detector.challenge_page?(resp)
+  end
 end

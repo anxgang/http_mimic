@@ -9,6 +9,8 @@ module HttpMimic
 
           if akamai?(response)
             :akamai
+          elsif google?(response)
+            :google
           elsif cloudflare?(response)
             :cloudflare
           elsif datadome?(response)
@@ -24,6 +26,16 @@ module HttpMimic
           return true if body.include?('sec-if-cpt-container') || body.include?('sec-bc-button-parent')
           return true if body.include?('challenges.cloudflare.com') || body.include?('cf-turnstile')
           return true if body.include?('datadome.captcha') || body.include?('geo.captcha-delivery.com')
+          return true if body.include?('/httpservice/retry/enablejs') || (body.include?('knitsail') && body.include?('SG_SS'))
+          false
+        end
+
+        def google?(response)
+          return false unless response
+          body = response.body.to_s
+          return true if body.include?('/httpservice/retry/enablejs')
+          return true if body.include?('knitsail') && body.include?('SG_SS')
+          return true if response.headers['server']&.downcase&.include?('gws') && body.include?('enablejs')
           false
         end
 

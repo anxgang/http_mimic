@@ -2,6 +2,7 @@
 
 require 'http_mimic/waf/detector'
 require 'http_mimic/waf/akamai_solver'
+require 'http_mimic/waf/google_solver'
 
 module HttpMimic
   module Waf
@@ -13,6 +14,8 @@ module HttpMimic
         case waf_type
         when :akamai
           AkamaiSolver.solve(url, response, options)
+        when :google
+          GoogleSolver.solve(url, response, options)
         else
           nil
         end

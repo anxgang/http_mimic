@@ -94,9 +94,10 @@ module HttpMimic
       args = []
       stdin_data = nil
 
-      # Base flags: silent mode, include HTTP headers
+      # Base flags: silent mode, include HTTP headers, auto-decompress responses
       args << '-s'
       args << '-i'
+      args << '--compressed'
 
       # HTTP Method
       if @method == 'HEAD'
@@ -386,6 +387,17 @@ module HttpMimic
         headers_to_send['upgrade-insecure-requests'] ||= '1'
         headers_to_send['accept'] ||= 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7'
         headers_to_send['accept-language'] ||= 'en-US,en;q=0.9'
+      end
+
+      # Smart Search referral context (e.g. searching from Google homepage)
+      begin
+        parsed_uri = URI.parse(url)
+        if parsed_uri && parsed_uri.host =~ /google\./i && parsed_uri.path =~ /\/search/i
+          headers_to_send['referer'] ||= "#{parsed_uri.scheme || 'https'}://#{parsed_uri.host}/"
+          headers_to_send['sec-fetch-site'] ||= 'same-origin'
+        end
+      rescue StandardError
+        # ignore
       end
     end
 

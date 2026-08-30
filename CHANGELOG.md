@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1] - 2026-08-30
+
+### Added
+- **Google Search Guard & BotGuard VM Detection**:
+  - Added `HttpMimic::Waf::GoogleSolver` and `HttpMimic::Waf::Detector.google?` for detecting Google Search Guard (`knitsail`, `enablejs`, `SG_SS`) challenges.
+  - Added automatic Google Search referral context (`Referer: https://www.google.com/`, `sec-fetch-site: same-origin`) in `CommandBuilder#apply_navigation_headers`.
+- **Authentic Hardware & WebGL Pipeline Emulation in QuickJS Context**:
+  - Full WebGL shader compilation and rasterization pipeline (`createShader`, `compileShader`, `getShaderPrecisionFormat`, `createProgram`, `linkProgram`, `readPixels` simulated gradient buffer).
+  - Dynamic font measurement (`REAL_FONT_METRICS`) with exact macOS Chrome `offsetWidth` / `offsetHeight` dimensions across 17 font families and 7 font sizes.
+  - Authentic Chromium `OfflineAudioContext` audio buffer rendering curve.
+  - Physics-based Cubic Bézier Spline mouse movement simulation with velocity decay, natural micro-jitter, and complete click event chains.
+  - Polyfills for `trustedTypes`, `sessionStorage`, `localStorage`, and `document.currentScript`.
+- **Automatic Response Decompression**:
+  - Added `--compressed` flag to CommandBuilder to ensure automatic transparent decompression of `gzip`, `deflate`, `br` (Brotli), and `zstd` payloads.
+
 ## [0.4.0] - 2026-08-30
 
 ### Added
