@@ -98,4 +98,34 @@ class WafTest < Minitest::Test
     assert_equal :google, HttpMimic::Waf::Detector.detect(resp)
     assert HttpMimic::Waf::Detector.challenge_page?(resp)
   end
+
+  def test_akamai_verified_abck_detection
+    cookies_unverified = { '_abck' => 'UUID~-1~encrypted~xyz' }
+    cookies_verified = { '_abck' => 'UUID~0~encrypted~xyz' }
+
+    refute HttpMimic::Waf::AkamaiSolver.verified_abck?(cookies_unverified)
+    assert HttpMimic::Waf::AkamaiSolver.verified_abck?(cookies_verified)
+    refute HttpMimic::Waf::AkamaiSolver.verified_abck?({})
+    refute HttpMimic::Waf::AkamaiSolver.verified_abck?(nil)
+  end
+
+  def test_akamai_build_driver_script_two_phase
+    script_p1 = HttpMimic::Waf::AkamaiSolver.build_driver_script(
+      target_url: 'https://example.com/items',
+      doc_title: 'Title',
+      cookie_str: 'session=1',
+      referer: 'https://example.com/',
+      phase: 1
+    )
+    assert_includes script_p1, 'globalThis.__TELEMETRY_PHASE__ = 1;'
+
+    script_p2 = HttpMimic::Waf::AkamaiSolver.build_driver_script(
+      target_url: 'https://example.com/items',
+      doc_title: 'Title',
+      cookie_str: 'session=1; bm_s=xyz',
+      referer: 'https://example.com/',
+      phase: 2
+    )
+    assert_includes script_p2, 'globalThis.__TELEMETRY_PHASE__ = 2;'
+  end
 end

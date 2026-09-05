@@ -258,4 +258,38 @@ class HttpMimicTest < Minitest::Test
     binary_ios, = ios_builder.build
     assert_match(/(safari260_ios|safari180_ios|safari184_ios|safari|curl)/, binary_ios)
   end
+
+  def test_command_builder_firefox_profile
+    firefox_builder = HttpMimic::CommandBuilder.new(:get, 'https://example.com', { profile: :firefox })
+    binary_ff, args, = firefox_builder.build
+    assert_match(/(curl_firefox135|curl_firefox|curl-impersonate-ff|curl-impersonate|curl)/, binary_ff)
+    refute args.any? { |a| a.start_with?('sec-ch-ua') }
+  end
+
+  def test_determine_profiles_uses_browser_profiles_without_curl_regression
+    req = HttpMimic::Request.new(:get, 'https://example.com', mode: :auto)
+    profiles = req.send(:determine_profiles, :auto, true)
+    assert_equal [:impersonate, :android, :ios, :firefox], profiles
+  end
+
+  def test_best_response_preservation_when_last_attempt_is_error
+    req = HttpMimic::Request.new(:get, 'https://example.com', mode: :auto, auto_fallback: true)
+    status_0 = Struct.new(:exitstatus).new(0)
+
+    # Attempt 1 returns 403, Attempt 2 returns 200, Attempt 3 returns 403
+    responses = [
+      "HTTP/2 403 Forbidden\r\n\r\nForbidden",
+      "HTTP/2 200 OK\r\n\r\nSuccess Content",
+      "HTTP/2 403 Forbidden\r\n\r\nBlocked Again"
+    ]
+
+    req.define_singleton_method(:execute_open3) do |*args|
+      raw = responses.shift || "HTTP/2 403 Forbidden\r\n\r\nForbidden"
+      [raw, '', status_0]
+    end
+
+    final_resp = req.perform
+    assert_equal 200, final_resp.code
+    assert_equal 'Success Content', final_resp.body.strip
+  end
 end

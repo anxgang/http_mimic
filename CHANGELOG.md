@@ -12,6 +12,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `persist_on_failure` (default: `false`): Ensures failed/blocked requests (403, 401, retry statuses, or WAF challenge pages) do not save invalid or bot-flagged cookies to disk.
   - `clear_on_failure` (default: `true`): Automatically purges stored host cookies when a request fails verification or is blocked by WAF, preventing poisoned sessions from breaking subsequent requests.
   - Added class-level DSL and configuration support (`HttpMimic.persist_on_failure`, `HttpMimic.clear_on_failure`).
+- **Two-Phase Telemetry Handshake in `AkamaiSolver`**:
+  - Automatic multi-round telemetry loop sending second-stage interaction sensor posts after initial cookie acquisition to flip `_abck` tokens from `~-1~` to verified `~0~`.
+- **Intelligent Profile Fallback & WAF Protection**:
+  - `:auto` mode now rotates between distinct browser engines (`:impersonate` [Chrome], `:android`, `:ios`, `:firefox`) and skips plain `:curl` fallback on WAF targets to avoid IP flagging.
+  - Added `:firefox` and `:safari` profile support in `CommandBuilder`.
+  - Added Best Response Preservation: prevents successful/200 progress from being wiped out by later failed fallback attempts.
+  - Automatic escalation to Tier 2 (Obscura) for Behavioral CAPTCHA challenge pages (`challenge_page?`).
 
 ## [0.5.1] - 2026-08-30
 

@@ -248,6 +248,10 @@ module HttpMimic
         (options[:ios_impersonate] || 'safari260_ios').to_s.downcase
       when :mobile
         (options[:mobile_impersonate] || 'chrome131_android').to_s.downcase
+      when :firefox
+        (options[:firefox_impersonate] || 'firefox135').to_s.downcase
+      when :safari
+        (options[:safari_impersonate] || 'safari180').to_s.downcase
       else
         (options[:impersonate] || config.default_impersonate).to_s.downcase
       end

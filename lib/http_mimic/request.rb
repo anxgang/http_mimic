@@ -40,6 +40,7 @@ module HttpMimic
       attempts = []
       profiles_to_try = determine_profiles(mode, auto_fallback)
       waf_solve_attempted = false
+      best_response = nil
 
       response = nil
       final_status = nil
@@ -47,6 +48,12 @@ module HttpMimic
       final_command = nil
 
       profiles_to_try.each_with_index do |profile, index|
+        # Never fall back to plain curl if a WAF challenge has already been detected/attempted
+        if profile == :curl && waf_solve_attempted
+          log_debug("[HttpMimic] Skipping plain :curl fallback for protected WAF target.")
+          next
+        end
+
         current_opts = options.merge(profile: profile)
 
         builder = CommandBuilder.new(method, url, current_opts, config)
@@ -86,6 +93,17 @@ module HttpMimic
         final_stderr = stderr
         final_command = full_command
 
+        # Track best response so a 200 (or challenge page) isn't wiped out by a failed fallback
+        if response
+          if best_response.nil?
+            best_response = response
+          elsif response.success? && !best_response.success?
+            best_response = response
+          elsif response.code == 200 && best_response.code != 200
+            best_response = response
+          end
+        end
+
         # Forward any received cookies to subsequent attempts
         if response.cookies && !response.cookies.empty?
           existing_cookies = options[:cookies] ? (options[:cookies].is_a?(Hash) ? options[:cookies] : options[:cookies].to_h) : {}
@@ -108,6 +126,9 @@ module HttpMimic
               if response.cookies && !response.cookies.empty?
                 options[:cookies] = (options[:cookies] || {}).merge(response.cookies.to_h)
               end
+              if response.success? || (response.code == 200 && best_response&.code != 200)
+                best_response = response
+              end
             end
           end
         end
@@ -119,26 +140,37 @@ module HttpMimic
         log_debug("[HttpMimic] Attempt #{index + 1} with #{profile} resulted in status #{response.code}. Triggering smart fallback to next profile...")
       end
 
-      # Automatic SPA Detection & Obscura rendering fallback
+      # Preserve best response if the last attempt resulted in a regression (e.g. 403 / error after getting 200)
+      if best_response && (response.nil? || response.error? || (final_status && final_status.exitstatus != 0))
+        if best_response.success? || (best_response.code == 200 && response&.code != 200)
+          response = best_response
+        end
+      end
+
+      # Automatic SPA Detection & Obscura rendering fallback for SPA shells & Behavioral Challenges
       auto_render_spa = options.fetch(:auto_render_spa, config.auto_render_spa)
-      if auto_render_spa && response && response.success? && method.to_s.upcase == 'GET'
-        if SpaDetector.spa?(response)
-          log_debug("[HttpMimic] Detected unhydrated SPA shell on #{url}. Automatically rendering with Obscura...")
-          begin
-            spa_opts = options.dup
-            # Forward all validated cookies from Tier 1 (Mode 2: Two-Phase Pipeline)
-            if response.cookies && !response.cookies.empty?
-              tier1_cookies = response.cookies.to_h
-              existing_cookies = spa_opts[:cookies].is_a?(Hash) ? spa_opts[:cookies] : {}
-              spa_opts[:cookies] = existing_cookies.merge(tier1_cookies)
-            end
-            rendered_resp = Obscura.render(url, spa_opts)
-            if rendered_resp && rendered_resp.success?
-              response = rendered_resp
-            end
-          rescue StandardError => e
-            log_debug("[HttpMimic] Automatic Obscura SPA render failed (#{e.message}), keeping Tier 1 response.")
+      auto_solve_waf = options.fetch(:solve_waf, config.auto_solve_waf)
+      should_render_spa = auto_render_spa && response && response.success? && SpaDetector.spa?(response)
+      should_render_cpt = auto_solve_waf && response && Waf::Detector.challenge_page?(response)
+
+      if (should_render_spa || should_render_cpt) && method.to_s.upcase == 'GET'
+        target_reason = should_render_cpt ? 'WAF challenge page' : 'unhydrated SPA shell'
+        log_debug("[HttpMimic] Detected #{target_reason} on #{url}. Automatically rendering with Obscura...")
+        begin
+          spa_opts = options.dup
+          # Forward all validated cookies from Tier 1 (Mode 2: Two-Phase Pipeline)
+          if response.cookies && !response.cookies.empty?
+            tier1_cookies = response.cookies.to_h
+            existing_cookies = spa_opts[:cookies].is_a?(Hash) ? spa_opts[:cookies] : {}
+            spa_opts[:cookies] = existing_cookies.merge(tier1_cookies)
           end
+          spa_opts[:wait_until] ||= 'load' if should_render_cpt
+          rendered_resp = Obscura.render(url, spa_opts)
+          if rendered_resp && rendered_resp.success?
+            response = rendered_resp
+          end
+        rescue StandardError => e
+          log_debug("[HttpMimic] Automatic Obscura render failed (#{e.message}), keeping Tier 1 response.")
         end
       end
 
@@ -174,7 +206,7 @@ module HttpMimic
     def determine_profiles(mode, auto_fallback)
       case mode
       when :curl, :curl_first
-        auto_fallback ? [:curl, :impersonate, :android, :ios] : [:curl]
+        auto_fallback ? [:curl, :impersonate, :android, :ios, :firefox] : [:curl]
       when :curl_only
         [:curl]
       when :impersonate_only
@@ -185,18 +217,22 @@ module HttpMimic
         [:android]
       when :ios_only
         [:ios]
+      when :firefox_only
+        [:firefox]
+      when :safari_only
+        [:safari]
       when :mobile_first
-        auto_fallback ? [:android, :ios, :impersonate, :curl] : [:mobile]
+        auto_fallback ? [:android, :ios, :impersonate, :firefox] : [:mobile]
       when :android_first
-        auto_fallback ? [:android, :ios, :impersonate, :curl] : [:android]
+        auto_fallback ? [:android, :ios, :impersonate, :firefox] : [:android]
       when :ios_first
-        auto_fallback ? [:ios, :android, :impersonate, :curl] : [:ios]
+        auto_fallback ? [:ios, :android, :impersonate, :firefox] : [:ios]
       when :impersonate_first
-        auto_fallback ? [:impersonate, :android, :ios, :curl] : [:impersonate]
+        auto_fallback ? [:impersonate, :android, :ios, :firefox] : [:impersonate]
       when :auto, :smart
-        auto_fallback ? [:impersonate, :android, :ios, :curl] : [:impersonate]
+        auto_fallback ? [:impersonate, :android, :ios, :firefox] : [:impersonate]
       else
-        auto_fallback ? [:impersonate, :android, :ios, :curl] : [:impersonate]
+        auto_fallback ? [:impersonate, :android, :ios, :firefox] : [:impersonate]
       end
     end
 
