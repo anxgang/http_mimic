@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.3] - 2026-09-05
+
+### Added
+- **Automatic Free Proxy Pool (`auto_proxy`)**:
+  - Built-in `HttpMimic::ProxyPool` automatically gathers and caches hundreds of public HTTP proxies from maintained sources (`monosans`, `proxyscrape`, `TheSpeedX`).
+  - Disabled by default (`auto_proxy: false`) with per-request and global configuration opt-in.
+  - Transparent proxy failure retry: automatically detects dead proxies (exit codes 5, 7, 28, 35, 56 or connection errors), marks them dead in the pool, and transparently retries with fresh proxies up to `proxy_retries` (default: 3).
+  - Explicit manual `:proxy` option always takes precedence over `auto_proxy`.
+  - Seamless integration with Obscura and WAF solver handshakes.
+  - Added DSL helpers (`HttpMimic.auto_proxy`, `HttpMimic.proxy_pool`, `HttpMimic.refresh_proxies!`).
+- **Streamlined Documentation**:
+  - Refined README with concise, high-level highlights focusing on core anti-detect capabilities and developer experience.
+
 ## [0.5.2] - 2026-09-05
 
 ### Added
@@ -18,13 +31,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `:auto` mode now rotates between distinct browser engines (`:impersonate` [Chrome], `:android`, `:ios`, `:firefox`) and skips plain `:curl` fallback on WAF targets to avoid IP flagging.
   - Added `:firefox` and `:safari` profile support in `CommandBuilder`.
   - Added Best Response Preservation: prevents successful/200 progress from being wiped out by later failed fallback attempts.
-- **Automatic Free Proxy Pool (`auto_proxy`)**:
-  - Built-in `HttpMimic::ProxyPool` automatically gathers and caches hundreds of public HTTP proxies from maintained sources (`monosans`, `proxyscrape`, `TheSpeedX`).
-  - Disabled by default (`auto_proxy: false`) with per-request and global configuration opt-in.
-  - Transparent proxy failure retry: automatically detects dead proxies (exit codes 5, 7, 28, 35, 56 or connection errors), marks them dead in the pool, and transparently retries with fresh proxies up to `proxy_retries` (default: 3).
-  - Explicit manual `:proxy` option always takes precedence over `auto_proxy`.
-  - Seamless integration with Obscura and WAF solver handshakes.
-  - Added DSL helpers (`HttpMimic.auto_proxy`, `HttpMimic.proxy_pool`, `HttpMimic.refresh_proxies!`).
 
 ## [0.5.1] - 2026-08-30
 

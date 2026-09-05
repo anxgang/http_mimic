@@ -1,41 +1,27 @@
-# HttpMimic
+# HttpMimic 🎭
 
-`http_mimic` is a Ruby HTTP Client gem built on top of `Open3.capture3` and `curl-impersonate`.
-It provides an elegant, concise, and intuitive **HTTParty-style** API while leveraging [`lexiforest/curl-impersonate`](https://github.com/lexiforest/curl-impersonate) to simulate authentic Chrome, Firefox, Safari, Edge, and Tor TLS / HTTP2 fingerprints (JA3, JA4, Akamai) and handshakes.
+> **Next-Generation Anti-Detect HTTP Client for Ruby**  
+> An elegant, high-performance HTTP client combining authentic browser TLS/JA4 fingerprint impersonation, built-in anti-bot challenge solving, lightweight headless SPA rendering, and an automatic free proxy pool into an intuitive HTTParty-style API.
 
-It also includes **Webdrivers-like automatic driver management**, automatically downloading and managing `curl-impersonate` binaries across macOS, Linux, and Windows without manual setup.
+`http_mimic` provides a complete, modern toolchain for accessing protected endpoints and web scraping:
+- **🎭 Authentic Browser Fingerprints**: Simulates authentic Chrome, Safari (macOS & iOS), Android, and Firefox TLS 1.3 / HTTP/2 handshakes and JA3/JA4 signatures.
+- **🛡️ Built-in Anti-Bot Defense**: Automatically detects and solves advanced WAF challenges at microsecond speeds without the overhead of heavy browsers.
+- **⚡ Dual-Tier Engine with Headless SPA Support**: Fast HTTP-first pipeline with seamless escalation to an embedded, lightweight (<100MB) Rust+V8 headless engine (`auto_render_spa`) when dynamic DOM rendering is needed.
+- **🌐 Automatic Free Proxy Pool (`auto_proxy`)**: Built-in, zero-dependency proxy pool with health tracking, auto-rotation, and transparent failure retry.
+- **🍪 Resilient Session Management**: Host-based persistent cookie caching with automatic anti-poisoning protection to prevent tainted sessions.
+- **📦 Zero-Setup Driver Management**: Automatically provisions and manages required native binaries across macOS, Linux, and Windows on demand.
+- **🚀 Intuitive Ruby DSL**: Clean, idiomatic syntax supporting class mixins (`include HttpMimic`), direct module calls (`HttpMimic.get`), and reusable client instances.
 
 ---
 
-## 🌟 Features
+## 🌟 Highlights
 
-- **Webdrivers-Style Driver Management**:
-  - Automatically downloads and unpacks official binaries from [`lexiforest/curl-impersonate`](https://github.com/lexiforest/curl-impersonate) to `~/.http_mimic/bin`.
-  - **Automatic platform & architecture detection** (macOS ARM/Intel, Linux x86_64/aarch64/musl, Windows x86_64/arm64, FreeBSD).
-  - Zero configuration required—installs on first request automatically.
-  - Manual driver management helpers: `HttpMimic.download_driver!`, `HttpMimic.driver_installed?`, `HttpMimic::Downloader.available_binaries`.
-- **Authentic Browser Handshakes & Fingerprints**:
-  - Chrome support: `chrome131` (default), `chrome124`, `chrome120`, `chrome133a`, `chrome136`, `chrome142`, `chrome99-110`.
-  - Firefox support: `firefox135`, `firefox133`, `firefox144`, `firefox117`, `firefox109`, `firefox102`, `firefox98`.
-  - Safari support: `safari180`, `safari170`, `safari155`, `safari153`.
-  - Edge & Tor support: `edge101`, `edge99`, `tor145`.
-- **HTTParty-Style API**:
-  - Direct module methods: `HttpMimic.get`, `HttpMimic.post`, etc.
-  - Class mixin via `include HttpMimic` (`base_uri`, `headers`, `default_params`, `default_timeout`, `impersonate`, `proxy`, `cookies`, `persist_cookies`).
-  - Reusable instance client: `HttpMimic::Client.new(...)`.
-- **Zero Shell Injection Risk**:
-  - Executes commands with array arguments via `Open3.capture3(*cmd_array)`.
-  - Uses stdin streaming (`-d @-`) to safely handle large payloads without hitting OS command-line limits.
-- **Smart Response Parsing**:
-  - HTTP status helpers: `response.code`, `response.success?`, `response.redirect?`, `response.client_error?`, `response.server_error?`.
-  - Case-insensitive header access: `response.headers['Content-Type']`.
-  - Automatic `Set-Cookie` header parsing: `response.cookies['session_id']`.
-  - Auto-parsed JSON with object delegation: `response['key']`, `response.parsed_response`.
-  - Complete 3xx redirect history tracking: `response.history`.
-- **Comprehensive Request Options**:
-  - Supports `query`, `headers`, `json`, `body` (form data), `cookies`, `timeout`, `connect_timeout`, `proxy`, `basic_auth`, `digest_auth`, `bearer_token`, `insecure`, custom `curl_options`, and more.
-- **Graceful Fallback**:
-  - If a specific binary is unavailable and auto-download is disabled, automatically falls back to system standard `curl`.
+- **Authentic TLS & HTTP/2 Impersonation**: Native support for `chrome131` (default), `chrome120-142`, `safari180` (macOS/iOS), `firefox135`, `edge101`, and `tor145`.
+- **Intelligent Challenge Resolution**: Automatic WAF challenge mitigation and smart profile fallback to keep requests succeeding.
+- **Client-Side SPA Hydration**: High-speed HTTP execution by default, with optional V8 DOM hydration for complex JavaScript apps (`auto_render_spa: true`).
+- **Free Proxy Pool & Auto-Rotation**: Opt-in proxy management (`auto_proxy: true`) with automatic dead-proxy detection and retry.
+- **Safe & Reliable**: Zero shell injection risk via `Open3.capture3(*cmd_array)`, safe stdin streaming for large payloads, and smart response parsing.
+- **Flexible Integration**: Works seamlessly as a one-off client, a reusable instance, or a class-level DSL.
 
 ---
 
