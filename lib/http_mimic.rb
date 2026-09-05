@@ -21,6 +21,7 @@ require 'http_mimic/waf'
 require 'http_mimic/cookie_store'
 require 'http_mimic/obscura'
 require 'http_mimic/spa_detector'
+require 'http_mimic/proxy_pool'
 
 module HttpMimic
   extend ModuleMethods

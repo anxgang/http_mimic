@@ -16,6 +16,16 @@ module HttpMimic
     def perform
       mode = (options[:mode] || config.mode || :auto).to_sym
 
+      # Automatic Free Proxy Pool integration
+      should_auto_proxy = options.fetch(:auto_proxy, config.auto_proxy)
+      if should_auto_proxy && !options[:proxy]
+        selected_proxy = ProxyPool.get
+        if selected_proxy
+          options[:proxy] = selected_proxy
+          log_debug("[HttpMimic::ProxyPool] Assigned proxy from pool: #{selected_proxy}")
+        end
+      end
+
       # Delegate directly to Obscura headless SPA renderer if requested
       if options[:render] == :spa || options[:render] == :obscura || mode == :spa || mode == :obscura
         return Obscura.render(url, options)
@@ -41,6 +51,7 @@ module HttpMimic
       profiles_to_try = determine_profiles(mode, auto_fallback)
       waf_solve_attempted = false
       best_response = nil
+      proxy_retries_left = should_auto_proxy ? (options[:proxy_retries] || config.proxy_retries || 3) : 0
 
       response = nil
       final_status = nil
@@ -68,6 +79,25 @@ module HttpMimic
         log_debug("Curl exit status: #{status.exitstatus}")
         log_debug("Curl stderr: #{stderr}") unless stderr.empty?
 
+        # Handle proxy failure retry when auto_proxy is enabled
+        if should_auto_proxy && current_opts[:proxy] && (status.exitstatus != 0)
+          is_proxy_err = [5, 7, 28, 35, 56].include?(status.exitstatus) ||
+                         stderr.include?('Failed to connect to') ||
+                         stderr.include?('tunneling failed') ||
+                         stderr.downcase.include?('proxy')
+
+          if is_proxy_err
+            ProxyPool.mark_dead(current_opts[:proxy])
+            if proxy_retries_left > 0
+              proxy_retries_left -= 1
+              new_proxy = ProxyPool.get
+              log_debug("[HttpMimic::ProxyPool] Proxy #{current_opts[:proxy]} failed (exit #{status.exitstatus}). Retrying with new proxy #{new_proxy} (#{proxy_retries_left} retries left)...")
+              options[:proxy] = new_proxy
+              redo
+            end
+          end
+        end
+
         response = ResponseParser.new(
           stdout,
           exit_status: status,
@@ -75,6 +105,10 @@ module HttpMimic
           command: full_command,
           request_url: final_url
         ).parse
+
+        if should_auto_proxy && current_opts[:proxy] && response.success?
+          ProxyPool.mark_alive(current_opts[:proxy])
+        end
 
         response.mode_used = profile
         response.fallback_triggered = (index > 0)

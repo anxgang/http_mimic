@@ -292,6 +292,7 @@ end
 | `:timeout` | Integer / Float | Maximum execution timeout in seconds (`--max-time`) |
 | `:connect_timeout` | Integer / Float | Connection timeout in seconds (`--connect-timeout`) |
 | `:proxy` | String | Proxy address (e.g., `'http://127.0.0.1:8888'`) |
+| `:auto_proxy` | Boolean | Automatically fetch and rotate through a pool of free HTTP proxies (default: `false`) |
 | `:basic_auth` | Hash | `{ username: 'admin', password: 'secret' }` |
 | `:bearer_token` | String | Appends `Authorization: Bearer <token>` header |
 | `:insecure` | Boolean | Disable SSL certificate verification (`-k`) |
@@ -337,6 +338,53 @@ response = HttpMimic.spa('https://example.com/spa')
 - `:eval` - JavaScript expression to evaluate in page context
 - `:dump` - output format: `'html'` (default), `'text'`, `'links'`, `'markdown'`, `'cookies'`
 - `:stealth` - whether stealth anti-detection is enabled (default: `true`)
+
+---
+
+## 🌐 Automatic Free Proxy Pool (`auto_proxy`)
+
+`http_mimic` provides a built-in, zero-dependency Free Proxy Pool manager. When enabled, `HttpMimic` automatically fetches and pools hundreds of free HTTP proxies from maintained public sources (monosans, ProxyScrape, TheSpeedX), automatically marks dead proxies, and transparently retries requests on network or proxy failure.
+
+By default, `auto_proxy` is **`false`** so users can choose when to opt-in.
+
+### 1. Per-Request Opt-in
+
+```ruby
+# Automatically obtain a proxy from the pool and execute request
+response = HttpMimic.get('https://httpbin.org/ip', auto_proxy: true)
+
+# Explicit proxy always takes precedence over auto_proxy:
+response = HttpMimic.get('https://httpbin.org/ip', auto_proxy: true, proxy: 'http://my-dedicated-proxy:8080')
+```
+
+### 2. Global Configuration
+
+```ruby
+HttpMimic.configure do |config|
+  config.auto_proxy = true          # Enable free proxy pool by default
+  config.proxy_retries = 3          # Maximum proxy retry attempts on connection failure
+  config.proxy_pool_ttl = 1800      # Cache duration for fetched proxy list (seconds)
+end
+
+# Or via class-level DSL:
+HttpMimic.auto_proxy = true
+```
+
+### 3. Proxy Pool Management
+
+```ruby
+# Check available pool size
+HttpMimic.proxy_pool.size
+
+# Sample a random proxy from the pool
+HttpMimic.proxy_pool.sample # => "http://185.200.188.234:10001"
+
+# Manually refresh the proxy pool
+HttpMimic.refresh_proxies!
+
+# Load custom proxies into the pool
+HttpMimic.proxy_pool.load(['http://1.2.3.4:8080', 'http://5.6.7.8:3128'])
+```
 
 ---
 

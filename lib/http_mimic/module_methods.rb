@@ -35,6 +35,24 @@ module HttpMimic
       default_options[:proxy] = proxy_str
     end
 
+    def auto_proxy(enabled = nil)
+      return default_options[:auto_proxy] if enabled.nil?
+      default_options[:auto_proxy] = enabled
+    end
+
+    def proxy_pool
+      ProxyPool.instance
+    end
+
+    def proxy_sources(sources = nil)
+      return configuration.proxy_sources if sources.nil?
+      configuration.proxy_sources = sources
+    end
+
+    def refresh_proxies!(force: true)
+      ProxyPool.refresh!(force: force)
+    end
+
     def cookies(c = nil)
       return default_options[:cookies] if c.nil?
       default_options[:cookies] ||= {}

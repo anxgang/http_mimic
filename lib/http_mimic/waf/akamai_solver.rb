@@ -22,6 +22,7 @@ module HttpMimic
             impersonate: impersonate,
             cookies: cookies,
             headers: { 'Referer' => target_url },
+            proxy: options[:proxy],
             auto_fallback: false,
             solve_waf: false
           )
@@ -52,7 +53,7 @@ module HttpMimic
 
           # 3. Post Phase 1 sensor data to Akamai endpoint
           updated_cookies = cookies.dup
-          post_sensor_data(sensor_script_url, target_url, impersonate, updated_cookies, sensor_posts_1)
+          post_sensor_data(sensor_script_url, target_url, impersonate, updated_cookies, sensor_posts_1, proxy: options[:proxy])
 
           # 4. Phase 2: If _abck is not verified yet (~0~), perform second round after short pause
           if !verified_abck?(updated_cookies)
@@ -71,7 +72,7 @@ module HttpMimic
             result2 = JSRuntime.eval_json(driver_script_2)
             sensor_posts_2 = result2 && result2['sensor_posts']
             if sensor_posts_2 && !sensor_posts_2.empty?
-              post_sensor_data(sensor_script_url, target_url, impersonate, updated_cookies, sensor_posts_2)
+              post_sensor_data(sensor_script_url, target_url, impersonate, updated_cookies, sensor_posts_2, proxy: options[:proxy])
             end
           end
 
@@ -118,7 +119,7 @@ module HttpMimic
           JS
         end
 
-        def post_sensor_data(sensor_script_url, target_url, impersonate, updated_cookies, sensor_posts)
+        def post_sensor_data(sensor_script_url, target_url, impersonate, updated_cookies, sensor_posts, proxy: nil)
           origin_url = URI.parse(target_url).tap { |u| u.path = ''; u.query = nil }.to_s rescue target_url
           sensor_posts.each do |post|
             post_body = post['body']
@@ -144,6 +145,7 @@ module HttpMimic
                 'Origin' => origin_url,
                 'Accept' => '*/*'
               },
+              proxy: proxy,
               body: post_body,
               auto_fallback: false,
               solve_waf: false

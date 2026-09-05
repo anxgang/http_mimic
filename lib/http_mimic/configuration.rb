@@ -48,6 +48,13 @@ module HttpMimic
     # Modern Navigation Headers simulation
     attr_accessor :navigation_headers
 
+    # Automatic Free Proxy Pool settings
+    attr_accessor :auto_proxy
+    attr_accessor :proxy_sources
+    attr_accessor :proxy_retries
+    attr_accessor :proxy_pool_ttl
+    attr_accessor :proxy_timeout
+
     def initialize
       @default_impersonate         = 'chrome131'
       @default_mobile_impersonate  = 'safari180_ios'
@@ -96,6 +103,13 @@ module HttpMimic
 
       # Navigation Headers defaults
       @navigation_headers          = true
+
+      # Automatic Free Proxy Pool defaults
+      @auto_proxy                  = false
+      @proxy_sources               = nil
+      @proxy_retries               = 3
+      @proxy_pool_ttl              = 1800
+      @proxy_timeout               = 5
     end
   end
 end
