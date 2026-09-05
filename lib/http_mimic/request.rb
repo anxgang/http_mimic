@@ -48,8 +48,8 @@ module HttpMimic
       end
 
       attempts = []
-      profiles_to_try = determine_profiles(mode, auto_fallback)
-      waf_solve_attempted = false
+      profiles_to_try = determine_profiles(mode, auto_fallback, options[:profile])
+      waf_solve_attempts = 0
       best_response = nil
       proxy_retries_left = should_auto_proxy ? (options[:proxy_retries] || config.proxy_retries || 3) : 0
 
@@ -60,7 +60,7 @@ module HttpMimic
 
       profiles_to_try.each_with_index do |profile, index|
         # Never fall back to plain curl if a WAF challenge has already been detected/attempted
-        if profile == :curl && waf_solve_attempted
+        if profile == :curl && waf_solve_attempts > 0
           log_debug("[HttpMimic] Skipping plain :curl fallback for protected WAF target.")
           next
         end
@@ -79,25 +79,6 @@ module HttpMimic
         log_debug("Curl exit status: #{status.exitstatus}")
         log_debug("Curl stderr: #{stderr}") unless stderr.empty?
 
-        # Handle proxy failure retry when auto_proxy is enabled
-        if should_auto_proxy && current_opts[:proxy] && (status.exitstatus != 0)
-          is_proxy_err = [5, 7, 28, 35, 56].include?(status.exitstatus) ||
-                         stderr.include?('Failed to connect to') ||
-                         stderr.include?('tunneling failed') ||
-                         stderr.downcase.include?('proxy')
-
-          if is_proxy_err
-            ProxyPool.mark_dead(current_opts[:proxy])
-            if proxy_retries_left > 0
-              proxy_retries_left -= 1
-              new_proxy = ProxyPool.get
-              log_debug("[HttpMimic::ProxyPool] Proxy #{current_opts[:proxy]} failed (exit #{status.exitstatus}). Retrying with new proxy #{new_proxy} (#{proxy_retries_left} retries left)...")
-              options[:proxy] = new_proxy
-              redo
-            end
-          end
-        end
-
         response = ResponseParser.new(
           stdout,
           exit_status: status,
@@ -106,7 +87,23 @@ module HttpMimic
           request_url: final_url
         ).parse
 
-        if should_auto_proxy && current_opts[:proxy] && response.success?
+        # Handle proxy failure retry when auto_proxy is enabled
+        is_proxy_failure = should_auto_proxy && current_opts[:proxy] && proxy_failure?(status, stderr, response)
+        if is_proxy_failure
+          ProxyPool.mark_dead(current_opts[:proxy])
+          if proxy_retries_left > 0
+            proxy_retries_left -= 1
+            new_proxy = ProxyPool.get
+            log_debug("[HttpMimic::ProxyPool] Proxy #{current_opts[:proxy]} failed (exit #{status&.exitstatus}, code #{response&.code}, empty body: #{response&.body.to_s.empty?}). Retrying with new proxy #{new_proxy} (#{proxy_retries_left} retries left)...")
+            options[:proxy] = new_proxy
+            redo
+          else
+            log_debug("[HttpMimic::ProxyPool] Proxy retries exhausted (#{current_opts[:proxy]} failed). Aborting profile fallback.")
+            break
+          end
+        end
+
+        if should_auto_proxy && current_opts[:proxy] && response.success? && !is_proxy_failure
           ProxyPool.mark_alive(current_opts[:proxy])
         end
 
@@ -127,14 +124,18 @@ module HttpMimic
         final_stderr = stderr
         final_command = full_command
 
-        # Track best response so a 200 (or challenge page) isn't wiped out by a failed fallback
-        if response
-          if best_response.nil?
-            best_response = response
-          elsif response.success? && !best_response.success?
-            best_response = response
-          elsif response.code == 200 && best_response.code != 200
-            best_response = response
+        # Track best response so a 200 isn't wiped out by a failed fallback.
+        # Only accept responses from successful curl executions that are not proxy failures or WAF challenges.
+        if response && (status.nil? || status.exitstatus == 0) && !is_proxy_failure
+          is_challenge = Waf::Detector.challenge_page?(response)
+          if !is_challenge
+            if best_response.nil?
+              best_response = response
+            elsif response.success? && !best_response.success?
+              best_response = response
+            elsif response.code == 200 && best_response.code != 200
+              best_response = response
+            end
           end
         end
 
@@ -145,13 +146,13 @@ module HttpMimic
         end
 
         auto_solve_waf = options.fetch(:solve_waf, config.auto_solve_waf)
-        is_blocked = (status.exitstatus != 0) || retry_statuses.include?(response.code) || Waf::Detector.challenge_page?(response)
+        is_blocked = (status.exitstatus != 0) || is_proxy_failure || retry_statuses.include?(response.code) || Waf::Detector.challenge_page?(response)
 
-        # Only attempt WAF resolution once per request to avoid unnecessary latency on subsequent fallbacks
-        if is_blocked && auto_solve_waf && !waf_solve_attempted && method.to_s.upcase == 'GET'
+        # Only attempt WAF resolution if origin server returned challenge (not a proxy error)
+        if is_blocked && !is_proxy_failure && auto_solve_waf && waf_solve_attempts < 2 && method.to_s.upcase == 'GET'
           waf_type = Waf::Detector.detect(response)
           if waf_type
-            waf_solve_attempted = true
+            waf_solve_attempts += 1
             log_debug("[HttpMimic] Detected #{waf_type.to_s.capitalize} WAF challenge. Attempting to solve with QuickJS...")
             solved_resp = Waf.solve(url, response, current_opts)
             if solved_resp
@@ -160,7 +161,8 @@ module HttpMimic
               if response.cookies && !response.cookies.empty?
                 options[:cookies] = (options[:cookies] || {}).merge(response.cookies.to_h)
               end
-              if response.success? || (response.code == 200 && best_response&.code != 200)
+              is_challenge_res = Waf::Detector.challenge_page?(response)
+              if !is_challenge_res && (response.success? || (response.code == 200 && best_response&.code != 200))
                 best_response = response
               end
             end
@@ -175,17 +177,16 @@ module HttpMimic
       end
 
       # Preserve best response if the last attempt resulted in a regression (e.g. 403 / error after getting 200)
-      if best_response && (response.nil? || response.error? || (final_status && final_status.exitstatus != 0))
+      if best_response && !Waf::Detector.challenge_page?(best_response) && (response.nil? || response.error? || (final_status && final_status.exitstatus != 0) || Waf::Detector.challenge_page?(response))
         if best_response.success? || (best_response.code == 200 && response&.code != 200)
           response = best_response
         end
       end
 
-      # Automatic SPA Detection & Obscura rendering fallback for SPA shells & Behavioral Challenges
+      # Automatic SPA Detection & Obscura rendering fallback (strictly requires auto_render_spa: true)
       auto_render_spa = options.fetch(:auto_render_spa, config.auto_render_spa)
-      auto_solve_waf = options.fetch(:solve_waf, config.auto_solve_waf)
       should_render_spa = auto_render_spa && response && response.success? && SpaDetector.spa?(response)
-      should_render_cpt = auto_solve_waf && response && Waf::Detector.challenge_page?(response)
+      should_render_cpt = auto_render_spa && response && Waf::Detector.challenge_page?(response)
 
       if (should_render_spa || should_render_cpt) && method.to_s.upcase == 'GET'
         target_reason = should_render_cpt ? 'WAF challenge page' : 'unhydrated SPA shell'
@@ -231,13 +232,34 @@ module HttpMimic
         end
       end
 
+      # If the final response was an intercepted dummy 200 from a broken/intercepting proxy, override code
+      if response && should_auto_proxy && proxy_failure?(final_status, final_stderr, response)
+        if response.code == 200 && response.body.to_s.empty?
+          response.instance_variable_set(:@code, 0)
+          response.instance_variable_set(:@status_message, 'Proxy Interception Failure (Empty Body)')
+        end
+      end
+
+      # If the final response is an un-bypassed WAF challenge page, annotate status message so it's clear
+      if response && response.challenge_page? && (response.status_message.to_s.empty? || response.status_message == 'OK')
+        type_str = response.challenge_type ? response.challenge_type.to_s.capitalize : 'WAF'
+        response.instance_variable_set(:@status_message, "Challenge Required (#{type_str})")
+      end
+
       handle_errors(final_status, final_stderr, final_command, response)
       response
     end
 
     private
 
-    def determine_profiles(mode, auto_fallback)
+    def determine_profiles(mode, auto_fallback, explicit_profile = nil)
+      if explicit_profile
+        p_sym = explicit_profile.to_sym
+        return [p_sym] unless auto_fallback
+        defaults = [:impersonate, :android, :ios, :firefox, :safari, :curl]
+        return ([p_sym] + defaults).uniq
+      end
+
       case mode
       when :curl, :curl_first
         auto_fallback ? [:curl, :impersonate, :android, :ios, :firefox] : [:curl]
@@ -268,6 +290,37 @@ module HttpMimic
       else
         auto_fallback ? [:impersonate, :android, :ios, :firefox] : [:impersonate]
       end
+    end
+
+    def proxy_failure?(status, stderr, response)
+      # 1. Non-zero exit status from curl when using proxy (connection failed, SSL error, empty reply, etc.)
+      return true if status.nil? || status.exitstatus != 0
+
+      # 2. Origin server did not return a valid response (e.g. only CONNECT tunnel block or code 0)
+      return true if response.nil? || response.code == 0
+
+      # 3. Known proxy-level error codes
+      return true if [407, 502, 503, 504].include?(response.code)
+
+      # 4. Proxy fake 200 OK interception detection:
+      # A GET request that returns 200 with empty body is almost always a proxy interception / dummy response
+      if method.to_s.upcase == 'GET' && response.code == 200 && response.body.to_s.empty?
+        server_hdr  = response.headers['server'].to_s.downcase
+        via_hdr     = response.headers['via'].to_s.downcase
+        content_len = response.headers['content-length']
+
+        is_proxy_marker = server_hdr.include?('proxy') ||
+                          server_hdr.include?('squid') ||
+                          server_hdr.include?('console') ||
+                          server_hdr.include?('privoxy') ||
+                          server_hdr.include?('tinyproxy') ||
+                          via_hdr.include?('proxy') ||
+                          content_len == '0'
+
+        return true if is_proxy_marker
+      end
+
+      false
     end
 
     def execute_open3(command_array, stdin_data)

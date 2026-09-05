@@ -63,7 +63,7 @@ class HttpMimicTest < Minitest::Test
 
     binary, args, stdin_data, final_url = builder.build
 
-    assert_includes ['curl', 'curl_chrome131', 'curl_chrome116', 'curl-impersonate-chrome'], File.basename(binary)
+    assert_includes ['curl', 'curl_chrome150', 'curl_chrome131', 'curl_chrome116', 'curl-impersonate-chrome'], File.basename(binary)
     assert_includes args, '-s'
     assert_includes args, '-i'
     assert_includes args, '-X'
@@ -291,5 +291,79 @@ class HttpMimicTest < Minitest::Test
     final_resp = req.perform
     assert_equal 200, final_resp.code
     assert_equal 'Success Content', final_resp.body.strip
+  end
+
+  def test_response_parser_strips_proxy_connect_block
+    raw = "HTTP/1.1 200 Connection established\r\n\r\nHTTP/2 200 OK\r\ncontent-type: text/html\r\n\r\n<html>Real Origin Page</html>"
+    parser = HttpMimic::ResponseParser.new(raw)
+    response = parser.parse
+
+    assert_equal 200, response.code
+    assert_equal 'OK', response.status_message
+    assert_equal '<html>Real Origin Page</html>', response.body
+    assert_empty response.history
+  end
+
+  def test_response_parser_lone_connect_block_returns_code_0
+    raw = "HTTP/1.1 200 Connection established\r\n\r\n"
+    parser = HttpMimic::ResponseParser.new(raw)
+    response = parser.parse
+
+    assert_equal 0, response.code
+    refute response.success?
+    assert_equal '', response.body
+  end
+
+  def test_response_success_requires_zero_exit_code
+    resp_ok = HttpMimic::Response.new(code: 200, exit_code: 0, body: 'content')
+    assert resp_ok.success?
+    refute resp_ok.error?
+
+    resp_fail = HttpMimic::Response.new(code: 200, exit_code: 60, body: '')
+    refute resp_fail.success?
+    assert resp_fail.error?
+  end
+
+  def test_response_automatic_challenge_detection
+    html = '<!DOCTYPE html><html><body><div id="sec-if-cpt-container" style="display:none"></div></body></html>'
+    resp = HttpMimic::Response.new(code: 200, exit_code: 0, body: html)
+
+    assert resp.challenge?
+    assert resp.challenge_page?
+    assert_equal :akamai, resp.challenge_type
+    refute resp.success?, 'A WAF challenge page must never be considered a successful response'
+    assert resp.error?
+    assert_includes resp.inspect, '@challenge=true (akamai)'
+  end
+
+  def test_tier2_not_invoked_on_challenge_without_auto_render_spa
+    html = '<!DOCTYPE html><html><body><div id="sec-if-cpt-container" style="display:none"></div></body></html>'
+    raw = "HTTP/2 200 OK\r\n\r\n#{html}"
+    mock_status = Struct.new(:exitstatus).new(0)
+    obscura_called = false
+
+    req = HttpMimic::Request.new(:get, 'https://example.com/cpt')
+    req.define_singleton_method(:execute_open3) { |*| [raw, '', mock_status] }
+
+    old_render = HttpMimic::Obscura.method(:render)
+    old_verbose = $VERBOSE
+    $VERBOSE = nil
+    HttpMimic::Obscura.singleton_class.send(:define_method, :render) do |*|
+      obscura_called = true
+      HttpMimic::Response.new(code: 200, body: 'rendered')
+    end
+    $VERBOSE = old_verbose
+
+    begin
+      resp = req.perform
+      refute obscura_called, 'Tier 2 Obscura must not be launched automatically without auto_render_spa: true'
+      assert resp.challenge?
+      assert_equal 200, resp.code
+      refute resp.success?
+    ensure
+      $VERBOSE = nil
+      HttpMimic::Obscura.singleton_class.send(:define_method, :render, old_render)
+      $VERBOSE = old_verbose
+    end
   end
 end

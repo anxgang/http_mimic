@@ -15,7 +15,7 @@ module HttpMimic
 
     TARGET_BINARY_MAP = {
       # Chrome Desktop
-      'chrome'            => %w[curl_chrome131 curl_chrome124 curl_chrome120 curl_chrome116 curl_chrome110 curl-impersonate-chrome curl_chrome curl-impersonate],
+      'chrome'            => %w[curl_chrome150 curl_chrome146 curl_chrome145 curl_chrome136 curl_chrome133a curl_chrome131 curl_chrome124 curl_chrome120 curl_chrome116 curl_chrome110 curl-impersonate-chrome curl_chrome curl-impersonate],
       'chrome116'         => %w[curl_chrome116 curl-impersonate-chrome curl_chrome curl-impersonate],
       'chrome120'         => %w[curl_chrome120 curl-impersonate-chrome curl_chrome curl-impersonate],
       'chrome123'         => %w[curl_chrome123 curl-impersonate-chrome curl_chrome curl-impersonate],
@@ -118,10 +118,12 @@ module HttpMimic
       end
 
       # Timeouts
-      timeout = options[:timeout] || options[:read_timeout] || config.default_timeout
+      default_max_time = options[:auto_proxy] ? 12 : config.default_timeout
+      timeout = options[:timeout] || options[:read_timeout] || default_max_time
       args << '--max-time' << timeout.to_s if timeout
 
-      connect_timeout = options[:connect_timeout] || config.default_connect_timeout
+      default_conn_timeout = options[:auto_proxy] ? 4 : config.default_connect_timeout
+      connect_timeout = options[:connect_timeout] || default_conn_timeout
       args << '--connect-timeout' << connect_timeout.to_s if connect_timeout
 
       # SSL / Insecure

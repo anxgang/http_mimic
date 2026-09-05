@@ -46,8 +46,26 @@ module HttpMimic
       !!@fallback_triggered
     end
 
+    def challenge_page?
+      if defined?(HttpMimic::Waf::Detector)
+        @challenge_page ||= HttpMimic::Waf::Detector.challenge_page?(self)
+      else
+        false
+      end
+    end
+    alias challenge? challenge_page?
+    alias blocked? challenge_page?
+
+    def challenge_type
+      if defined?(HttpMimic::Waf::Detector)
+        @challenge_type ||= HttpMimic::Waf::Detector.detect(self)
+      else
+        nil
+      end
+    end
+
     def success?
-      code >= 200 && code < 300
+      exit_code == 0 && (code >= 200 && code < 300) && !challenge_page?
     end
     alias ok? success?
 
@@ -64,7 +82,7 @@ module HttpMimic
     end
 
     def error?
-      client_error? || server_error?
+      exit_code != 0 || client_error? || server_error? || challenge_page?
     end
 
     def binary?
@@ -159,7 +177,8 @@ module HttpMimic
     end
 
     def inspect
-      "#<#{self.class.name}:0x#{object_id.to_s(16)} @code=#{code} @status_message=#{status_message.inspect} @headers=#{headers.to_h.inspect} @parsed_response=#{parsed_response.inspect}>"
+      challenge_info = challenge_page? ? " @challenge=true (#{challenge_type || 'WAF'})" : ""
+      "#<#{self.class.name}:0x#{object_id.to_s(16)} @code=#{code}#{challenge_info} @status_message=#{status_message.inspect} @headers=#{headers.to_h.inspect} @parsed_response=#{parsed_response.inspect}>"
     end
 
     private

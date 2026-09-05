@@ -25,7 +25,7 @@ module HttpMimic
       # @param response [HttpMimic::Response]
       # @return [Boolean]
       def spa?(response)
-        return false unless response && response.success?
+        return false unless response && (response.code >= 200 && response.code < 300)
         return false if response.respond_to?(:binary?) && response.binary?
 
         content_type = response.headers['content-type'].to_s.downcase

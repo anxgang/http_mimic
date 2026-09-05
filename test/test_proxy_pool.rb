@@ -197,4 +197,66 @@ class ProxyPoolTest < Minitest::Test
     assert captured_opts
     assert_equal 'http://10.0.0.5:8080', captured_opts[:proxy]
   end
+
+  def test_auto_proxy_retries_on_exit_code_60_and_52
+    pool = HttpMimic::ProxyPool.instance
+    pool.load(['10.0.0.1:8080', '10.0.0.2:8080'])
+
+    req = HttpMimic::Request.new(:get, 'https://example.com', auto_proxy: true, auto_fallback: false)
+    call_count = 0
+    executed_proxies = []
+
+    req.define_singleton_method(:execute_open3) do |cmd, stdin|
+      call_count += 1
+      cmd_str = cmd.join(' ')
+      proxy = cmd_str.match(/-x (http:\/\/[^\s]+)/)&.[](1)
+      executed_proxies << proxy
+
+      if call_count == 1
+        # First call fails with exit code 60 (SSL peer certificate verification failed)
+        err_status = Struct.new(:exitstatus).new(60)
+        ['HTTP/1.1 200 OK\r\nContent-Length: 0\r\nServer: Security Console\r\n\r\n', 'curl: (60) SSL certificate problem', err_status]
+      else
+        ok_status = Struct.new(:exitstatus).new(0)
+        ["HTTP/2 200 OK\r\nContent-Length: 12\r\n\r\nReal Content", '', ok_status]
+      end
+    end
+
+    resp = req.perform
+    assert_equal 200, resp.code
+    assert_equal 'Real Content', resp.body
+    assert_equal 2, call_count
+    assert_includes pool.dead_proxies, executed_proxies.first
+  end
+
+  def test_auto_proxy_retries_on_fake_200_empty_body_with_exit_0
+    pool = HttpMimic::ProxyPool.instance
+    pool.load(['10.0.0.1:8080', '10.0.0.2:8080'])
+
+    req = HttpMimic::Request.new(:get, 'https://example.com/item', auto_proxy: true, auto_fallback: false)
+    call_count = 0
+    executed_proxies = []
+
+    req.define_singleton_method(:execute_open3) do |cmd, stdin|
+      call_count += 1
+      cmd_str = cmd.join(' ')
+      proxy = cmd_str.match(/-x (http:\/\/[^\s]+)/)&.[](1)
+      executed_proxies << proxy
+
+      if call_count == 1
+        # Intercepted fake 200 with empty body and proxy server header (even if exit is 0)
+        ok_status = Struct.new(:exitstatus).new(0)
+        ["HTTP/1.1 200 OK\r\nServer: Security Console\r\nContent-Length: 0\r\n\r\n", '', ok_status]
+      else
+        ok_status = Struct.new(:exitstatus).new(0)
+        ["HTTP/2 200 OK\r\nContent-Length: 9\r\n\r\nReal HTML", '', ok_status]
+      end
+    end
+
+    resp = req.perform
+    assert_equal 200, resp.code
+    assert_equal 'Real HTML', resp.body
+    assert_equal 2, call_count
+    assert_includes pool.dead_proxies, executed_proxies.first
+  end
 end

@@ -6,6 +6,7 @@ module HttpMimic
   class ResponseParser
     HTTP_STATUS_LINE_REGEX = /\AHTTP\/(?<version>[\d\.]+)\s+(?<code>\d{3})(?:\s+(?<message>.*))?/i
     HTTP_STATUS_LINE_B     = /\AHTTP\/(?:[\d\.]+)\s+\d{3}/i
+    PROXY_CONNECT_REGEX    = /\AHTTP\/[\d\.]+\s+200\s+Connection\s+established/i
     BINARY_MIME_KEYWORDS   = %w[image/ audio/ video/ pdf octet-stream zip gzip tar compressed stream font wasm].freeze
 
     attr_reader :raw_output, :exit_status, :stderr, :command, :request_url
@@ -21,6 +22,11 @@ module HttpMimic
     def parse
       # Split header blocks and body in binary-safe manner
       header_blocks, raw_body = split_headers_and_body(@raw_output)
+
+      # Strip proxy CONNECT tunnel handshake blocks (e.g. "HTTP/1.1 200 Connection established")
+      while header_blocks.first && header_blocks.first =~ PROXY_CONNECT_REGEX
+        header_blocks.shift
+      end
 
       final_header_block = header_blocks.last || ''
       history_header_blocks = header_blocks.size > 1 ? header_blocks[0...-1] : []

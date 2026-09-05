@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.4] - 2026-09-05
+
+### Fixed
+- **Challenge Page Regression Prevention**:
+  - `HttpMimic::Request` no longer preserves un-bypassed WAF challenge pages (such as Akamai 200 CPT skeletons) as `best_response`. If all resolution and fallback attempts fail, true status codes (e.g. 403) are preserved instead of overwriting with skeleton 200 responses.
+- **Explicit Profile Forwarding in Fallbacks & Retries**:
+  - `determine_profiles` now respects `explicit_profile = options[:profile]`, ensuring targeted profiles (e.g., `:android`) remain active when `auto_fallback: false` and are prioritized during fallback loops.
+  - `AkamaiSolver` now explicitly forwards `profile` and concrete `impersonate` targets during final URL retries to prevent TLS/fingerprint mismatches.
+- **Mobile/Android Emulation Fidelity in QuickJS Browser Polyfill**:
+  - Fixed typo in Android platform identifier (`Linux armv8l` instead of `Linux armv81`).
+  - Mobile environments now correctly emulate zero-length plugin and mimeType lists (removing desktop-only PDF plugins).
+  - Aligned mobile screen dimensions (412x915 portrait-primary) and WebGL renderer parameters (Qualcomm Adreno 640).
+- **Default Impersonate Profile Upgraded to `chrome150`**:
+  - Upgraded default client TLS fingerprint to `chrome150` to satisfy modern Akamai edge HTTP/2 and TLS cipher requirements.
+- **Modern CORS & Fetch Headers in Sensor POSTs**:
+  - Automatically injected `Sec-Fetch-Dest: empty`, `Sec-Fetch-Mode: cors`, `Sec-Fetch-Site: same-origin`, and client hints (`sec-ch-ua`, `sec-ch-ua-mobile`, `sec-ch-ua-platform`).
+
 ## [0.5.3] - 2026-09-05
 
 ### Added

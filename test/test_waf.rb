@@ -135,6 +135,19 @@ class WafTest < Minitest::Test
     assert_equal 'https://example.com/GPv76JOU160CMneR0n-v19eGZa4/f0N14VQa9b/UXwvAQ/TiJIQ1N/mGAQa?v=67eebcce-63c0-8786-c1d9-b10f59dacb42&t=134988548', url
   end
 
+  def test_akamai_extract_multi_sensor_script_urls
+    html = <<~HTML
+      <html><body>
+        <script type="text/javascript" src="/GPv76JOU160CMneR0n-v19eGZa4/f0N14VQa9b/UXwvAQ/Cwo-Rxc/cPwAa?v=3266b183&amp;t=13894798"></script>
+        <script type="text/javascript" src="/GPv76JOU160CMneR0n-v19eGZa4/tEN14VQa9bzOc7f7/WGYpAQ/RAR7bB9/GBxMB"></script>
+      </body></html>
+    HTML
+    urls = HttpMimic::Waf::AkamaiSolver.extract_sensor_script_urls('https://www.adidas.com/page.html', html)
+    assert_equal 2, urls.size
+    assert_includes urls[0], 't=13894798'
+    assert_includes urls[1], 'RAR7bB9/GBxMB'
+  end
+
   def test_akamai_post_sensor_data_resolves_relative_and_empty_url
     target_url = 'https://example.com/page.html'
     sensor_url = 'https://example.com/sensor.js'
@@ -170,4 +183,132 @@ class WafTest < Minitest::Test
     assert_equal 'https://example.com/api/telemetry', posted_calls[1][:url]
     assert_equal 'updated', cookies['_abck']
   end
+
+  def test_akamai_verified_bm_sc_detection
+    cookies_bm_sc_verified = { 'bm_sc' => '1~1~997096923~token~0~0~0' }
+    cookies_bm_sc_unverified = { 'bm_sc' => '3~1~997096923~token~0~0~0' }
+
+    assert HttpMimic::Waf::AkamaiSolver.verified_abck?(cookies_bm_sc_verified)
+    refute HttpMimic::Waf::AkamaiSolver.verified_abck?(cookies_bm_sc_unverified)
+  end
+
+  def test_browser_context_dom_and_history_support
+    context_js = File.read(HttpMimic::Waf::AkamaiSolver::CONTEXT_JS_PATH)
+    test_script = <<~JS
+      globalThis.__TARGET_URL__ = "https://www.example.com/products/shoes.html";
+      #{context_js}
+
+      var a = document.createElement("a");
+      a.href = "https://www.example.com/checkout";
+
+      var s = document.createElement("script");
+      s.src = "/tracker.js?t=123";
+      document.body.appendChild(s);
+
+      history.pushState({ step: 1 }, "Checkout", "/checkout");
+
+      JSON.stringify({
+        doc_location_matches: document.location === location,
+        window_doc_matches: window.document === document,
+        history_state: history.state,
+        a_protocol: a.protocol,
+        a_hostname: a.hostname,
+        script_src: document.getElementsByTagName("script")[0].src
+      });
+    JS
+
+    result = HttpMimic::JSRuntime.eval_json(test_script)
+    assert result['doc_location_matches']
+    assert result['window_doc_matches']
+    assert_equal({ 'step' => 1 }, result['history_state'])
+    assert_equal 'https:', result['a_protocol']
+    assert_equal 'www.example.com', result['a_hostname']
+    assert_equal '/tracker.js?t=123', result['script_src']
+  end
+
+  def test_browser_context_shader_and_v8_jit_characteristics
+    context_js = File.read(HttpMimic::Waf::AkamaiSolver::CONTEXT_JS_PATH)
+    test_script = <<~JS
+      globalThis.__TARGET_URL__ = "https://www.example.com/item.html";
+      #{context_js}
+
+      // 1. Native reflection test
+      var toStringCallResult = Function.prototype.toString.call(document.createElement);
+      var nativeToStringName = Function.prototype.toString.name;
+
+      // 2. WebGL shader parameters and extensions
+      var canvas = document.createElement("canvas");
+      var gl = canvas.getContext("webgl");
+      var ext = gl.getExtension("WEBGL_debug_renderer_info");
+      var vendor = gl.getParameter(ext.UNMASKED_VENDOR_WEBGL);
+      var renderer = gl.getParameter(ext.UNMASKED_RENDERER_WEBGL);
+      var exts = gl.getSupportedExtensions();
+
+      // ReadPixels pipeline
+      gl.clearColor(0.8, 0.4, 0.2, 1.0);
+      var px = new Uint8Array(4);
+      gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+
+      // 3. Virtual JIT Clock monotonic & quantization test
+      var t1 = performance.now();
+      var t2 = performance.now();
+      var t3 = performance.now();
+
+      // 4. Navigator client hints & mediaDevices
+      var hasUAD = !!(navigator.userAgentData && navigator.userAgentData.brands.length > 0);
+      var hasMedia = !!(navigator.mediaDevices && typeof navigator.mediaDevices.enumerateDevices === "function");
+
+      JSON.stringify({
+        toStringCallResult: toStringCallResult,
+        nativeToStringName: nativeToStringName,
+        vendor: vendor,
+        renderer: renderer,
+        extsCount: exts.length,
+        hasInstanced: exts.indexOf("ANGLE_instanced_arrays") !== -1,
+        px: Array.from(px),
+        t1: t1,
+        t2: t2,
+        t3: t3,
+        monotonic: (t3 >= t2) && (t2 >= t1),
+        hasUAD: hasUAD,
+        hasMedia: hasMedia
+      });
+    JS
+
+    result = HttpMimic::JSRuntime.eval_json(test_script)
+    assert_equal 'function createElement() { [native code] }', result['toStringCallResult']
+    assert_equal 'toString', result['nativeToStringName']
+    assert_equal 'Google Inc. (Intel)', result['vendor']
+    assert_includes result['renderer'], 'ANGLE'
+    assert result['extsCount'] >= 30
+    assert result['hasInstanced']
+    assert_equal [204, 102, 51, 255], result['px']
+    assert result['monotonic']
+    assert result['hasUAD']
+    assert result['hasMedia']
+  end
+
+  def test_determine_profiles_respects_explicit_profile
+    req = HttpMimic::Request.new('https://example.com', :get)
+    assert_equal [:android], req.send(:determine_profiles, :auto, false, :android)
+    assert_equal :android, req.send(:determine_profiles, :auto, true, :android).first
+
+    assert_equal [:firefox], req.send(:determine_profiles, :auto, false, :firefox)
+    assert_equal :firefox, req.send(:determine_profiles, :auto, true, :firefox).first
+  end
+
+  def test_akamai_solver_resolve_impersonate_target
+    assert_equal 'chrome131_android', HttpMimic::Waf::AkamaiSolver.resolve_impersonate_target(:android)
+    assert_equal 'safari260_ios', HttpMimic::Waf::AkamaiSolver.resolve_impersonate_target(:ios)
+    assert_equal 'chrome150', HttpMimic::Waf::AkamaiSolver.resolve_impersonate_target(:impersonate)
+  end
+
+  def test_challenge_page_detection_on_200_response
+    raw = "HTTP/2 200 OK\r\nset-cookie: _abck=123~-1\r\n\r\n<html><body><div id=\"sec-if-cpt-container\"></div></body></html>"
+    resp = HttpMimic::ResponseParser.new(raw).parse
+    assert_equal 200, resp.code
+    assert resp.challenge_page?
+    assert_equal :akamai, resp.challenge_type
+  end
 end
+

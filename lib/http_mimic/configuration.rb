@@ -56,7 +56,7 @@ module HttpMimic
     attr_accessor :proxy_timeout
 
     def initialize
-      @default_impersonate         = 'chrome131'
+      @default_impersonate         = 'chrome150'
       @default_mobile_impersonate  = 'safari180_ios'
       @binary_path                 = nil
       @fallback_to_curl            = true
