@@ -310,5 +310,45 @@ class WafTest < Minitest::Test
     assert resp.challenge_page?
     assert_equal :akamai, resp.challenge_type
   end
+
+  def test_cookie_jar_and_script_src_in_browser_context
+    context_js = File.read(File.expand_path('../lib/http_mimic/waf/browser_context.js', __dir__))
+    script = <<~JS
+      globalThis.__TARGET_URL__ = "https://example.com/products/test";
+      globalThis.__DOCUMENT_TITLE__ = "";
+      globalThis.__USER_AGENT__ = "Mozilla/5.0 Chrome/150";
+      globalThis.__INITIAL_COOKIES__ = "geo_ip=1.2.3.4; bm_sz=abc~12345~6789";
+
+      #{context_js}
+
+      // 1. 測試 script.src 與 getAttribute
+      const s = document.createElement("script");
+      s.src = "https://example.com/cpt.js?v=1&t=9999";
+
+      // 2. 測試 document.cookie 的追加寫入 (例如 CPT 寫入 bm_lso)
+      document.cookie = "bm_lso=~99999; domain=.example.com; path=/";
+
+      // 3. 測試 XMLHttpRequest responseURL
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", "/api/cpt");
+
+      ({
+        scriptPropSrc: s.src,
+        scriptAttrSrc: s.getAttribute("src"),
+        cookie: document.cookie,
+        hasBmSz: document.cookie.includes("bm_sz=abc~12345~6789"),
+        hasBmLso: document.cookie.includes("bm_lso=~99999"),
+        xhrResponseURL: xhr.responseURL
+      });
+    JS
+
+    res = HttpMimic.eval_js_json(script)
+    assert_equal "https://example.com/cpt.js?v=1&t=9999", res["scriptPropSrc"]
+    assert_equal "https://example.com/cpt.js?v=1&t=9999", res["scriptAttrSrc"]
+    assert res["hasBmSz"], "bm_sz must be preserved after setting another cookie"
+    assert res["hasBmLso"], "bm_lso must be recorded in cookieJar"
+    assert_equal "https://example.com/api/cpt", res["xhrResponseURL"]
+  end
 end
+
 

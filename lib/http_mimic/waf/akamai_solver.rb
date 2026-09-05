@@ -144,18 +144,22 @@ module HttpMimic
 
         def build_driver_script(params)
           scripts_code = if params[:scripts_data] && !params[:scripts_data].empty?
-            dom_injection = params[:scripts_data].map do |s|
-              "const sTag_#{s[:url].hash.abs} = document.createElement('script'); sTag_#{s[:url].hash.abs}.src = #{s[:url].to_json}; document.body.appendChild(sTag_#{s[:url].hash.abs});"
+            params[:scripts_data].map.with_index do |s, idx|
+              tag_var = "sTag_#{idx}"
+              <<~SCRIPT_EVAL
+                const #{tag_var} = document.createElement('script');
+                #{tag_var}.src = #{s[:url].to_json};
+                document.body.appendChild(#{tag_var});
+                document.currentScript = #{tag_var};
+                try {
+                  ;\n#{s[:body]}\n;
+                } catch(e) {}
+              SCRIPT_EVAL
             end.join("\n")
-
-            exec_code = params[:scripts_data].map do |s|
-              ";\n#{s[:body]}\n;"
-            end.join("\n")
-
-            "#{dom_injection}\n#{exec_code}"
           else
             ";\n#{params[:sensor_js]}\n;"
           end
+
 
           <<~JS
             globalThis.__TARGET_URL__ = #{params[:target_url].to_json};
@@ -193,10 +197,16 @@ module HttpMimic
             post_url = if post['url'].to_s.empty?
               cpt_url || target_url
             elsif post['url'].start_with?('http')
-              post['url']
+              u = post['url']
+              if cpt_url && !u.include?('t=') && cpt_url.include?('t=')
+                q = URI.parse(cpt_url).query rescue nil
+                u = "#{u}?#{q}" if q && !q.empty?
+              end
+              u
             else
               URI.join(target_url, post['url']).to_s
             end
+
 
             content_type = (post['headers'] && (post['headers']['Content-Type'] || post['headers']['content-type'])) || 'application/json'
 

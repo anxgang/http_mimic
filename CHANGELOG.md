@@ -5,7 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.5] - 2026-09-05
+
+### Fixed
+- **QuickJS CPT & Bot Manager Telemetry Resolution (Tier 1 WAF Bypass)**:
+  - **Standard `document.cookie` CookieJar**: Replaced the plain property in `browser_context.js` with a compliant `Map`-backed CookieJar. When Akamai CPT writes `document.cookie = "bm_lso=..."`, existing session cookies (`bm_sz`, `_abck`) are preserved rather than overwritten. This fixes the critical bug where main sensor telemetry fell back to default hash `8888888` instead of the session cookie hash.
+  - **`HTMLScriptElement.src` Property Reflection**: Implemented bidirectional synchronization between `el.src` and `el.getAttribute("src")`. CPT scripts can now successfully inspect `document.currentScript.getAttribute("src")` to locate their challenge parameters and relative post endpoints.
+  - **Accurate `document.currentScript` Execution Pipeline**: `AkamaiSolver.build_driver_script` now assigns `document.currentScript` before evaluating each script block, matching real browser multi-script execution order.
+  - **Hybrid `XMLHttpRequest` with `responseURL` Support**: Retained instance-level methods (`open`, `send`) required by obfuscated Akamai scripts while maintaining prototype-level methods for DOM script hooks, and populating `responseURL` to allow `challenge.html` reload checks to succeed.
+  - **Challenge Query String Preservation in Telemetry POST**: When sending CPT PoW solutions, `AkamaiSolver` now preserves query parameters (e.g. `v=...&t=...`) from the original challenge script URL so that edge servers correctly issue validated `bm_sc` session tokens.
+- **End-to-End Akamai Verification**:
+  - `HttpMimic.get('https://www.adidas.com/om/en/samba-og-shoes/KK2371.html')` now successfully solves the CPT challenge within QuickJS and returns the complete 400KB+ product HTML without invoking Tier 2 Obscura.
+
 ## [0.5.4] - 2026-09-05
+
 
 ### Fixed
 - **Challenge Page Regression Prevention**:
