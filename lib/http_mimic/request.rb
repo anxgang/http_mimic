@@ -104,7 +104,7 @@ module HttpMimic
             solved_resp = Waf.solve(url, response, current_opts)
             if solved_resp
               response = solved_resp
-              is_blocked = (response.code != 0 && retry_statuses.include?(response.code))
+              is_blocked = (response.code != 0 && retry_statuses.include?(response.code)) || Waf::Detector.challenge_page?(response)
               if response.cookies && !response.cookies.empty?
                 options[:cookies] = (options[:cookies] || {}).merge(response.cookies.to_h)
               end
@@ -143,9 +143,26 @@ module HttpMimic
       end
 
       # Persist cookies back to store if enabled
-      if should_persist_cookie && host && response && response.cookies && !response.cookies.empty?
-        CookieStore.save(host, response.cookies)
-        log_debug("[HttpMimic::CookieStore] Saved #{response.cookies.size} cookies for #{host}")
+      if should_persist_cookie && host
+        is_success = response && (response.success? || response.redirect?) && !Waf::Detector.challenge_page?(response) && (final_status.nil? || final_status.exitstatus == 0)
+        verification_failed = !is_success && response && (
+          [401, 403].include?(response.code) ||
+          retry_statuses.include?(response.code) ||
+          Waf::Detector.challenge_page?(response)
+        )
+
+        persist_on_failure = options.fetch(:persist_on_failure, config.persist_on_failure)
+        clear_on_failure = options.fetch(:clear_on_failure, config.clear_on_failure)
+
+        if is_success || persist_on_failure
+          if response && response.cookies && !response.cookies.empty?
+            CookieStore.save(host, response.cookies)
+            log_debug("[HttpMimic::CookieStore] Saved #{response.cookies.size} cookies for #{host}")
+          end
+        elsif clear_on_failure && verification_failed
+          CookieStore.clear(host)
+          log_debug("[HttpMimic::CookieStore] Verification failed for #{host} (status: #{response&.code}). Cleared stored cookies.")
+        end
       end
 
       handle_errors(final_status, final_stderr, final_command, response)

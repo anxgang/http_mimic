@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.2] - 2026-09-05
+
+### Added
+- **Anti-Poisoning Failure Protection for CookieStore (`persist_on_failure`, `clear_on_failure`)**:
+  - `persist_on_failure` (default: `false`): Ensures failed/blocked requests (403, 401, retry statuses, or WAF challenge pages) do not save invalid or bot-flagged cookies to disk.
+  - `clear_on_failure` (default: `true`): Automatically purges stored host cookies when a request fails verification or is blocked by WAF, preventing poisoned sessions from breaking subsequent requests.
+  - Added class-level DSL and configuration support (`HttpMimic.persist_on_failure`, `HttpMimic.clear_on_failure`).
+
 ## [0.5.1] - 2026-08-30
 
 ### Added

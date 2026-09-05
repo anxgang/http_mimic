@@ -198,6 +198,8 @@ response = HttpMimic.get('https://example.com/items', persist_cookies: true)
 class Scraper
   include HttpMimic
   persist_cookies true
+  # persist_on_failure false # (default: do not save cookies on 403 / verification failure)
+  # clear_on_failure true    # (default: auto-clear cached cookies if verification fails)
 end
 
 # 3. Manual CookieStore helpers
@@ -205,6 +207,9 @@ HttpMimic.load_cookies('example.com')                  # => Hash of active cooki
 HttpMimic.save_cookies('example.com', { session: '123' }) # Save cookies with default TTL
 HttpMimic.clear_cookies!('example.com')                # Clear host or all cookies
 ```
+
+> **🛡️ Anti-Poisoning Failure Protection:**
+> By default, `persist_on_failure` is set to `false`, meaning cookies returned with HTTP error codes (e.g. 403, 401) or unverified WAF challenge pages are **never** persisted to disk. Furthermore, `clear_on_failure: true` automatically wipes tainted host cookies upon verification failure, preventing blocked sessions from poisoning subsequent requests.
 
 ---
 
@@ -247,6 +252,8 @@ HttpMimic.configure do |config|
   # Host CookieStore Persistence (disabled by default)
   config.persist_cookies         = false                                     # Auto-persist cookies per host
   config.cookie_store_dir        = File.expand_path('~/.http_mimic/cookies') # Directory for cookie store
+  config.persist_on_failure      = false                                     # Do not save cookies if request/verification fails
+  config.clear_on_failure        = true                                      # Purge cached host cookies on 403 / verification failure
 
   # WAF challenge solving (enabled by default)
   config.auto_solve_waf          = true        # Automatically solve detected WAF JS challenges
@@ -278,6 +285,8 @@ end
 | `:body` | Hash / String | Form payload (Hash) or raw request body string |
 | `:cookies` | Hash / String | Request cookies |
 | `:persist_cookies` | Boolean | Automatically load and save cookies for the host across requests |
+| `:persist_on_failure` | Boolean | Save cookies even if request or verification fails (default `false`) |
+| `:clear_on_failure` | Boolean | Automatically clear stored cookies on verification failure / 403 / WAF block (default `true`) |
 | `:cookie_jar` | String | Path to save cookies (`-c`) |
 | `:cookie_file` | String | Path to read cookies (`-b`) |
 | `:timeout` | Integer / Float | Maximum execution timeout in seconds (`--max-time`) |

@@ -46,6 +46,16 @@ module HttpMimic
       default_options[:persist_cookies] = enabled
     end
 
+    def persist_on_failure(enabled = nil)
+      return default_options[:persist_on_failure] if enabled.nil?
+      default_options[:persist_on_failure] = enabled
+    end
+
+    def clear_on_failure(enabled = nil)
+      return default_options[:clear_on_failure] if enabled.nil?
+      default_options[:clear_on_failure] = enabled
+    end
+
     def auto_render_spa(enabled = nil)
       return default_options[:auto_render_spa] if enabled.nil?
       default_options[:auto_render_spa] = enabled

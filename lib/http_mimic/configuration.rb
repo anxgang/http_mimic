@@ -42,6 +42,8 @@ module HttpMimic
     # Shared Host-based CookieStore settings
     attr_accessor :persist_cookies
     attr_accessor :cookie_store_dir
+    attr_accessor :persist_on_failure
+    attr_accessor :clear_on_failure
 
     # Modern Navigation Headers simulation
     attr_accessor :navigation_headers
@@ -89,6 +91,8 @@ module HttpMimic
       # Shared Host CookieStore defaults
       @persist_cookies             = false
       @cookie_store_dir            = File.expand_path('~/.http_mimic/cookies')
+      @persist_on_failure          = false
+      @clear_on_failure            = true
 
       # Navigation Headers defaults
       @navigation_headers          = true
