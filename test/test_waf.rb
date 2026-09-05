@@ -128,4 +128,46 @@ class WafTest < Minitest::Test
     )
     assert_includes script_p2, 'globalThis.__TELEMETRY_PHASE__ = 2;'
   end
+
+  def test_akamai_extract_sensor_script_url_with_html_entities_and_params
+    html = '<body><script type="text/javascript" src="/GPv76JOU160CMneR0n-v19eGZa4/f0N14VQa9b/UXwvAQ/TiJIQ1N/mGAQa?v=67eebcce-63c0-8786-c1d9-b10f59dacb42&amp;t=134988548"></script></body>'
+    url = HttpMimic::Waf::AkamaiSolver.extract_sensor_script_url('https://example.com/item.html', html)
+    assert_equal 'https://example.com/GPv76JOU160CMneR0n-v19eGZa4/f0N14VQa9b/UXwvAQ/TiJIQ1N/mGAQa?v=67eebcce-63c0-8786-c1d9-b10f59dacb42&t=134988548', url
+  end
+
+  def test_akamai_post_sensor_data_resolves_relative_and_empty_url
+    target_url = 'https://example.com/page.html'
+    sensor_url = 'https://example.com/sensor.js'
+    impersonate = 'chrome131'
+    cookies = HttpMimic::Cookies.new
+    posts = [
+      { 'url' => '', 'headers' => { 'Content-Type' => 'application/json' }, 'body' => '{"body":"xyz"}' },
+      { 'url' => '/api/telemetry', 'headers' => { 'Content-Type' => 'application/json' }, 'body' => '{"body":"abc"}' }
+    ]
+
+    posted_calls = []
+    old_post = HttpMimic.method(:post)
+    singleton = HttpMimic.singleton_class
+    old_verbose = $VERBOSE
+    $VERBOSE = nil
+    singleton.send(:define_method, :post) do |url, opts|
+      posted_calls << { url: url, opts: opts }
+      Struct.new(:cookies).new({ '_abck' => 'updated' })
+    end
+    $VERBOSE = old_verbose
+
+    begin
+      HttpMimic::Waf::AkamaiSolver.post_sensor_data(sensor_url, target_url, impersonate, cookies, posts)
+    ensure
+      $VERBOSE = nil
+      singleton.send(:define_method, :post, old_post)
+      $VERBOSE = old_verbose
+    end
+
+    assert_equal 2, posted_calls.size
+    assert_equal 'https://example.com/page.html', posted_calls[0][:url]
+    assert_equal 'application/json', posted_calls[0][:opts][:headers]['Content-Type']
+    assert_equal 'https://example.com/api/telemetry', posted_calls[1][:url]
+    assert_equal 'updated', cookies['_abck']
+  end
 end

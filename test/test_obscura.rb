@@ -120,4 +120,19 @@ class ObscuraTest < Minitest::Test
       end
     end
   end
+
+  def test_render_detects_403_block_page
+    blocked_html = '<html><head><title>adidas</title></head><body><span class="error">HTTP 403 - Forbidden</span></body></html>'
+    mock_status = Struct.new(:success?, :exitstatus).new(true, 0)
+
+    with_stub(Open3, :capture3, [blocked_html, '', mock_status]) do
+      with_stub(HttpMimic::Obscura, :resolve_binary, '/mock/bin/obscura') do
+        resp = HttpMimic.render('https://example.com/blocked')
+
+        assert_equal 403, resp.code
+        assert_equal 'Forbidden (WAF Blocked)', resp.status_message
+        refute resp.success?
+      end
+    end
+  end
 end

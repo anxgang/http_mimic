@@ -124,12 +124,22 @@ module HttpMimic
             post_body = post['body']
             next if post_body.nil? || post_body.empty?
 
+            post_url = if post['url'].to_s.empty?
+              target_url
+            elsif post['url'].start_with?('http')
+              post['url']
+            else
+              URI.join(target_url, post['url']).to_s
+            end
+
+            content_type = (post['headers'] && (post['headers']['Content-Type'] || post['headers']['content-type'])) || 'application/json'
+
             post_resp = HttpMimic.post(
-              sensor_script_url,
+              post_url,
               impersonate: impersonate,
               cookies: updated_cookies,
               headers: {
-                'Content-Type' => 'text/plain;charset=UTF-8',
+                'Content-Type' => content_type,
                 'Referer' => target_url,
                 'Origin' => origin_url,
                 'Accept' => '*/*'
@@ -152,13 +162,14 @@ module HttpMimic
         def extract_sensor_script_url(target_url, html)
           return nil if html.nil? || html.empty?
 
-          match = html.match(/<script[^>]*src=["\x27]([^"\x27]*\/[a-zA-Z0-9_-]{10,}\?[a-zA-Z0-9_=-]+)["\x27]/i)
+          match = html.match(/<script[^>]*src=["\x27]([^"\x27]*\/[a-zA-Z0-9_\-\/]+\?[^"\x27\s>]+)["\x27]/i)
           match ||= html.match(/<script[^>]*src=["\x27]([^"\x27]*akam[^"\x27]*)["\x27]/i)
-          match ||= html.match(/<script[^>]*src=["\x27]([^"\x27]*\/[a-zA-Z0-9_\-\/]+\?v=[a-zA-Z0-9_-]+)["\x27]/i)
+          match ||= html.match(/<script[^>]*src=["\x27]([^"\x27]*\/[a-zA-Z0-9_-]{10,}\?[a-zA-Z0-9_=-]+)["\x27]/i)
 
           return nil unless match
 
-          URI.join(target_url, match[1]).to_s
+          raw_url = match[1].gsub('&amp;', '&')
+          URI.join(target_url, raw_url).to_s
         rescue StandardError
           nil
         end

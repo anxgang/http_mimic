@@ -82,13 +82,32 @@ module HttpMimic
 
         code = (status && status.success?) ? 200 : (status ? status.exitstatus : 500)
 
-        raw_headers = "HTTP/2 200 OK\r\ncontent-type: text/html; charset=utf-8\r\nx-rendered-by: obscura\r\n\r\n"
+        # Detect if the rendered output contains an explicit HTTP error block page
+        if code == 200 && stdout
+          if stdout.include?('HTTP 403 - Forbidden') ||
+             (stdout.include?('Reference Error:') && stdout.include?('Akamai')) ||
+             stdout.include?('"page_name": "403 ERROR"')
+            code = 403
+          elsif stdout.include?('404 Not Found') && stdout.include?('<title>404')
+            code = 404
+          end
+        end
+
+        status_msg = if code == 200
+          'OK (Obscura SPA Rendered)'
+        elsif code == 403
+          'Forbidden (WAF Blocked)'
+        else
+          'Error'
+        end
+
+        raw_headers = "HTTP/2 #{code} #{status_msg}\r\ncontent-type: text/html; charset=utf-8\r\nx-rendered-by: obscura\r\n\r\n"
         headers = Headers.new({ 'content-type' => 'text/html; charset=utf-8', 'x-rendered-by' => 'obscura' })
 
         Response.new(
           code: code,
           http_version: 'HTTP/2',
-          status_message: status&.success? ? 'OK (Obscura SPA Rendered)' : 'Error',
+          status_message: status_msg,
           headers: headers,
           cookies: Cookies.new,
           body: stdout,
